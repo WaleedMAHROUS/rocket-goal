@@ -1,0 +1,23 @@
+ROCKET GOAL - install on a phone
+
+The game needs a web link to become a home-screen app (an iPhone cannot install a
+downloaded HTML file). Free ways to get a link:
+
+  1. Netlify Drop: open app.netlify.com/drop on a computer, sign in (free),
+     drag this whole folder onto the page. You get a link like
+     https://something.netlify.app
+  2. GitHub Pages: upload these files to a repository, then
+     Settings > Pages > Deploy from branch.
+
+Then on the phone:
+  iPhone (Safari): open the link > Share button > Add to Home Screen.
+  Android (Chrome): open the link > menu (three dots) > Install app / Add to Home screen.
+
+Open it once while online. After that it works with no internet.
+The phone's rotation lock must be OFF for the game to turn sideways.
+
+Players: each person taps their name on "Who's playing?". Level, coins, cars and
+training stars are saved per player, on that phone. The home-screen app keeps its
+own saves, separate from Safari.
+
+On a computer you can also just double-click index.html to play.

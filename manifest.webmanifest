@@ -1,0 +1,29 @@
+{
+  "name": "Rocket Goal",
+  "short_name": "Rocket Goal",
+  "description": "3D car soccer with ranked 1v1, 34 training levels, players and a garage.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#060914",
+  "theme_color": "#060914",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
