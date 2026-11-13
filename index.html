@@ -255,6 +255,7 @@ body.free #coach{top:calc(104px + var(--st))}
 .pray .honest .ar{font-size:20px;color:var(--ink)}
 .pray .clock2{font-family:var(--num);font-size:44px;font-weight:700;color:var(--boost);line-height:1;font-variant-numeric:tabular-nums}
 .pray .tipbox,.pray .two,.pray>.mbtn{width:100%}
+.pray .az{margin:0}
 .ptimes{display:grid;grid-template-columns:auto 1fr auto;gap:0 14px;align-items:center;font-weight:600;font-size:16px}
 .ptimes .ar{font-size:20px;text-align:right;line-height:1.5}
 .ptimes .t{font-family:var(--num);font-weight:700;text-align:right}
@@ -442,7 +443,8 @@ body.free #coach{top:calc(104px + var(--st))}
     <ul class="tips">
       <li><b>At every adhan</b> the game stops, even in the middle of a match, and waits for the prayer break. Your match waits for you, with no loss.</li>
       <li><b>Before you play</b> the game asks if you prayed. Be honest.</li>
-      <li><b>Goals</b> bring dhikr: Masha'Allah, SubhanAllah, Alhamdulillah.</li>
+      <li><b>At the adhan</b> the game plays the whole adhan. You can make it silent, but you cannot skip it.</li>
+      <li><b>Goals</b> bring dhikr on screen: Masha'Allah, SubhanAllah, Alhamdulillah.</li>
     </ul>
     <h3>Player</h3>
     <div class="setrow">
@@ -490,8 +492,8 @@ body.free #coach{top:calc(104px + var(--st))}
     <label class="psrow"><span>Method</span><select id="psMethod" class="psel"></select></label>
     <label class="psrow"><span>Asr</span><select id="psAsr" class="psel"><option value="1">Standard (Shafi'i, Maliki, Hanbali)</option><option value="2">Hanafi</option></select></label>
     <label class="psrow"><span>Prayer break</span><select id="psBrk" class="psel"><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option></select></label>
-    <button class="chip" id="psSpeak" type="button">Say dhikr out loud <b>ON</b></button>
-    <p class="rsub">At every adhan the game stops and waits for the prayer break. On Friday the Dhuhr break is at least 40 minutes, for Jumu'ah.</p>
+    <button class="chip" id="psTest" type="button">Test the adhan sound <b>PLAY</b></button>
+    <p class="rsub">At every adhan the game stops, plays the full adhan and waits for the prayer break. On Friday the Dhuhr break is at least 40 minutes, for Jumu'ah.</p>
     <button class="mbtn primary cut" id="psDone" type="button"><b>Done</b></button>
   </div>
 </section>
@@ -1409,8 +1411,8 @@ function carBall(c, ball) {
   const wd = wallDist(ball.pos.x, ball.pos.y, ball.pos.z);
   if (wd < BR + 0.3 && ball.pinchCD <= 0) {
     const w = wallNormal(ball.pos.x, ball.pos.y, ball.pos.z, tN2);
-    if (n.dot(w) < -0.3 && -vn > 5) {
-      const speed = clamp(-vn * 2.7 + 10, 26, BALLMAX);
+    if (n.dot(w) < -0.3 && -vn > 13) {   // a pinch needs a hard, fast hit; a soft push into the wall is just a normal touch
+      const speed = clamp(-vn * 2.6, 0, BALLMAX);
       const tv = tA.copy(n).addScaledVector(w, -n.dot(w));
       if (tv.lengthSq() < 0.04) tv.copy(c.vel).addScaledVector(w, -c.vel.dot(w));
       if (tv.lengthSq() < 0.01) tv.copy(c.fwd);
@@ -1443,9 +1445,33 @@ function carCar(a, b) {
   const d = tA.copy(b.pos).sub(a.pos), l = d.length(), R = 1.3;
   if (l >= R || l < 1e-5) return;
   d.multiplyScalar(1 / l);
+  // demolition, as in the original game: a car at supersonic speed that rams an opponent nose-first blows it up; the attacker drives on
+  if (a.team !== b.team) {
+    if (rams(a, d, 1)) { demolish(b, a); return; }
+    if (rams(b, d, -1)) { demolish(a, b); return; }
+  }
   a.pos.addScaledVector(d, -(R - l) / 2); b.pos.addScaledVector(d, (R - l) / 2);
   const vn = tB.copy(b.vel).sub(a.vel).dot(d);
   if (vn < 0) { a.vel.addScaledVector(d, vn * 0.65); b.vel.addScaledVector(d, -vn * 0.65); if (vn < -6) sfx.bounce(0.7); }
+}
+function rams(c, d, sgn) {   // d points from car a to car b; sgn flips it for b
+  if (c.vel.length() < SUPERSONIC - 0.5) return false;
+  c.axes();
+  return (c.fwd.x * d.x + c.fwd.y * d.y + c.fwd.z * d.z) * sgn > 0.55 && (c.vel.x * d.x + c.vel.y * d.y + c.vel.z * d.z) * sgn > 16;
+}
+function demolish(v, by) {
+  explode(v.pos, v.team === 0 ? BLUE : ORANGE, by.gfx);
+  burst(0.7, 2200, 70, 0.55); tone(80, 0.6, 'sawtooth', 0.25, 35);
+  v.active = false; v.mesh.g.visible = false; v.shadow.visible = false; if (v.tag) v.tag.visible = false;
+  v.vel.set(0, 0, 0); v.demoT = 3;
+  if (by === player) { flash('Demolition!', '#ffc24a', 1.2); award('Demolition', 25); buzz([30, 40, 30]); }
+  if (v === player) { flash('Demolished!', '#ff8a33', 1.6, 'Back in 3 seconds'); buzz(90); touchReset && touchReset(); }
+}
+function respawnCar(c) {   // back on the field at its own end, facing the play
+  const att = c.team === 0 ? 1 : -1;
+  c.place(pick([-2.5, 0, 2.5]), -att * 45, c.team === 0 ? 0 : Math.PI);
+  c.boost = 33; c.demoT = 0; c.active = true; c.mesh.g.visible = true; c.shadow.visible = true;
+  if (c.tag && c.tagOn) c.tag.visible = true;
 }
 const PRED_N = 100, PRED_DT = 1 / 33;
 const _pp = new V3(), _pv = new V3();
@@ -1596,9 +1622,9 @@ function botThink(b, dt) {
   if (sp < 1 && c.role === 'attacker') { b.stuck += dt; if (b.stuck > 2) { b.stuck = 0; b.act = { type: 'dodge', t: 0, fx: 0, sx: 0 }; return; } } else b.stuck = 0;
   if (c.role !== 'attacker') { position(b, P, bl, att); return; }
   if (nBalls === 1 && G.kickT < 7 && ball.vel.lengthSq() < 0.01 && Math.abs(ball.pos.x) + Math.abs(ball.pos.z) < 0.1) {   // kickoff
-    const ang = driveTo(c, I, ball.pos, P, P.kick >= 2 || (P.kick === 1 && G.kickT < 1.4));
-    I.hb = false;
-    if (P.kick >= 2 && c.pos.distanceTo(ball.pos) < 5.6 && Math.abs(ang) < 0.25) { const [fx, sx] = dirTo(c, ball.pos); b.act = { type: 'dodge', t: 0, fx, sx }; }
+    const ang = driveTo(c, I, ball.pos, P, true);   // kickoffs are always contested at full boost, so driving straight in is a 50/50, not a free goal
+    I.throttle = 1; I.hb = false;
+    if (P.kick >= 1 && c.pos.distanceTo(ball.pos) < 5.6 && Math.abs(ang) < 0.25) { const [fx, sx] = dirTo(c, ball.pos); b.act = { type: 'dodge', t: 0, fx, sx }; }
     return;
   }
   const bst = c.boost > 5 && b.wantBoost;
@@ -1677,8 +1703,9 @@ function botCar(team, i) {
   while (list.length <= i) { const c = new Car(team, true); showCar(c, false); list.push(c); }
   return list[i];
 }
-function showCar(c, on) { c.active = on; c.mesh.g.visible = on; c.shadow.visible = on; if (c.tag && !on) c.tag.visible = false; }
+function showCar(c, on) { c.active = on; c.demoT = 0; c.mesh.g.visible = on; c.shadow.visible = on; if (c.tag && !on) c.tag.visible = false; }
 function setTag(c, name) {   // a name tag floating over a bot car, in its team colour (null hides it)
+  c.tagOn = !!name;
   if (!name) { if (c.tag) c.tag.visible = false; return; }
   if (!c.tag) {
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
@@ -1709,6 +1736,7 @@ function placeBall(x, y, z, b) {
   b.pos.set(x, y, z); b.vel.set(0, 0, 0); b.spin = 0; b.live = true; b.hover = false; b.lastTouch = -1; b.lastCar = b.prevCar = null; b.threat = 0; b.respawnT = 0; b.mesh.visible = true;
 }
 function kickoff() {
+  for (const c of cars) if (c.demoT > 0 || !c.active) { c.demoT = 0; c.active = true; c.mesh.g.visible = true; c.shadow.visible = true; if (c.tag && c.tagOn) c.tag.visible = true; }
   const spots = shuffle(pick(KOC[G.ts]).slice());   // which blue car starts on which spot; orange mirrors them
   let bi = 0, oi = 0;
   for (const c of cars) {
@@ -1834,7 +1862,14 @@ function physicsStep(dt) {
   }
   if (st === 'play' && G.mode === 'challenge') {
     G.time -= dt;
-    if (G.time <= 0) { G.time = 0; chalEnd(!!curLevel().save); return; }
+    if (G.time <= 0) {
+      G.time = 0;
+      const lv = curLevel();
+      if (ball.pos.y < BR + 0.12) G.landed = true;   // once it touches the ground the extra chance is over
+      const live = !lv.save && ball.live && ball.lastCar === player && ((!G.landed && ball.pos.y > BR + 0.35) || goalBound(ball) === 1);
+      if (live && G.grace < 8) { if (!G.grace) flash('Ball still in play!', '#ffc24a', 1.4, 'It counts if it goes in before it lands'); G.grace += dt; }
+      else { chalEnd(!!lv.save); return; }
+    }
   } else if (st === 'play') {
     if (G.overtime) G.ot += dt;
     else {
@@ -2289,7 +2324,7 @@ function toMenu() {
   coachStart(false);
   G.state = 'menu'; G.mode = null; G.prayPaused = false; $('#hud').hidden = true; $('#touch').hidden = true; touchReset();
   document.body.classList.remove('free');
-  player.place(0, 0, 0.6); player.dress(S.eq);
+  player.place(0, 0, 0.6); player.dress(S.eq); showCar(player, true);
   for (const c of mates.concat(rivals)) showCar(c, false);
   cars = [player]; bots = []; setBalls(0); player.role = 'attacker'; player.tball = null;
   if (!curId) { openWho(); return; }
@@ -2322,7 +2357,6 @@ function showResult(won, promoted, line, r) {
   $('#resCard').innerHTML = html;
   showScreen('#result'); $('#hud').hidden = true; touchReset();
   setTimeout(() => { const p = $('#resProf'); if (p) p.innerHTML = profileHtml(S.level, S.xp); }, 500);
-  setTimeout(() => sayAr(dh[0]), 700);
   const mode = G.mode, again = { ts: G.ts, nb: G.nb };
   $('#againBtn').addEventListener('click', () => { audio(); sfx.ui(); launch(mode, again); });
   $('#menuBtn').addEventListener('click', toMenu);
@@ -2413,7 +2447,7 @@ function startChallenge(key, retry) {
   audio(); wake();
   G.mode = 'challenge'; G.ci = key; G.infBoost = false; G.score = [0, 0]; G.overtime = false; G.pts = 0; G.bd = {}; G.lastSec = -1; G.clock = 0; G.trainOK = false;
   for (const q of mates.concat(rivals)) showCar(q, false);
-  cars = [player]; bots = []; setBalls(1); G.ts = 1; G.nb = 1; G.prayPaused = false; G.startedAt = Date.now(); player.role = 'attacker'; player.tball = null;
+  cars = [player]; bots = []; setBalls(1); G.ts = 1; G.nb = 1; G.prayPaused = false; G.grace = 0; G.landed = false; showCar(player, true); G.startedAt = Date.now(); player.role = 'attacker'; player.tball = null;
   player.dress(S.eq);
   player.place(c.car[0], c.car[1], c.car[2]); player.boost = 100;
   for (const q of pads) q.t = 0;
@@ -2805,22 +2839,47 @@ const T_QADA = { ar: 'من نسي صلاة فليصلها إذا ذكرها', en
 const tipHtml = t => `<div class="tipbox"><span class="ar" lang="ar">${t.ar}</span><p>${t.en}</p>${t.src ? `<cite>${t.src}</cite>` : ''}</div>`;
 const MOON = '<svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 4A8.5 8.5 0 1 0 19.1 15 7 7 0 0 1 10.6 4Z" fill="currentColor"/></svg>';
 
-/* speaking: the device's own Arabic voice, when it has one. Without one the words are only shown. */
-let arVoice = null;
-function findVoice() { try { const vs = speechSynthesis.getVoices(); arVoice = vs.find(v => /^ar[-_](SA|001)/i.test(v.lang)) || vs.find(v => /^ar/i.test(v.lang)) || null; } catch (e) { arVoice = null; } }
-if ('speechSynthesis' in window) {
-  findVoice(); try { speechSynthesis.addEventListener('voiceschanged', findVoice); } catch (e) { speechSynthesis.onvoiceschanged = findVoice; }
-  const prime = () => {   // iPhones only allow speech after a tap: speak a silent word on the first one so later dhikr can be heard
-    removeEventListener('pointerdown', prime, true); removeEventListener('keydown', prime, true);
-    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
-  };
-  addEventListener('pointerdown', prime, true); addEventListener('keydown', prime, true);
+/* the adhan: the family's own recording (adhan.mp3, next to the page), played in full at every adhan.
+   It can be made silent (a meeting, say) but never skipped: the game stays locked while it plays. */
+const AZ = { el: null, url: '', unlocked: false, playing: false, muted: false, failed: false };
+function adhanEl() {
+  if (AZ.el) return AZ.el;
+  const el = AZ.el = new Audio(); el.preload = 'auto'; el.src = AZ.url || 'adhan.mp3';
+  el.addEventListener('ended', () => { AZ.playing = false; renderAdhanCtl(); });
+  el.addEventListener('error', () => {
+    if (el.src.startsWith('blob:')) { el.src = 'adhan.mp3'; if (AZ.playing) playAdhan(); }
+    else if (AZ.playing) { AZ.playing = false; AZ.failed = true; renderAdhanCtl(); }
+  });
+  return el;
 }
-function sayAr(text) {
-  if (!S.sound || !PS.speak || !('speechSynthesis' in window)) return;
-  if (!arVoice) findVoice();
-  if (!arVoice) return;
-  try { const u = new SpeechSynthesisUtterance(text); u.voice = arVoice; u.lang = arVoice.lang; u.rate = 0.85; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+// keep the file in memory as a blob: phones play it more reliably, also offline from the app's cache
+try { fetch('adhan.mp3').then(r => r.ok ? r.blob() : null).then(b => { if (b && b.size > 10000) { AZ.url = URL.createObjectURL(b); if (AZ.el && !AZ.unlocked && !AZ.playing) AZ.el.src = AZ.url; } }).catch(() => {}); } catch (e) {}
+function unlockAdhan() {   // phones only let sound start after a tap: play it silently once on a tap, so the adhan can start by itself later
+  if (AZ.unlocked || AZ.playing) return;
+  const el = adhanEl(); el.muted = true;
+  try {
+    const q = el.play();
+    if (q && q.then) q.then(() => { if (!AZ.playing) { el.pause(); try { el.currentTime = 0; } catch (e) {} } el.muted = AZ.muted; AZ.unlocked = true; }).catch(() => { el.muted = AZ.muted; });
+  } catch (e) {}
+}
+addEventListener('pointerdown', unlockAdhan, true); addEventListener('keydown', unlockAdhan, true);
+function playAdhan() {
+  const el = adhanEl(); AZ.muted = false; el.muted = false; el.volume = 1;
+  try { el.currentTime = 0; } catch (e) {}
+  AZ.playing = true; AZ.failed = false;
+  try { const q = el.play(); if (q && q.catch) q.catch(() => { AZ.playing = false; AZ.failed = true; renderAdhanCtl(); }); } catch (e) { AZ.playing = false; AZ.failed = true; }
+  renderAdhanCtl();
+}
+function stopAdhan() { if (AZ.el) AZ.el.pause(); AZ.playing = false; renderAdhanCtl(); }
+function renderAdhanCtl() {   // the sound button on the adhan screen: silent / sound on, or play if the phone blocked it
+  const b = $('#azBtn'), st = $('#azState');
+  if (b && st) {
+    if (AZ.playing) { st.textContent = AZ.muted ? 'The adhan is playing silently.' : 'The adhan is playing.'; b.hidden = false; b.innerHTML = AZ.muted ? '<b>Turn sound on</b>' : '<b>Make it silent</b>'; }
+    else if (AZ.failed) { st.textContent = 'The phone did not let the adhan start by itself.'; b.hidden = false; b.innerHTML = '<b>Play the adhan</b>'; }
+    else { st.textContent = ''; b.hidden = true; }
+  }
+  const t = $('#psTest'); if (t) t.lastChild.textContent = AZ.playing ? 'STOP' : 'PLAY';
+  tickPrayer(Date.now());
 }
 let dhT = 0, dhLast = '';
 function dhikr(kind) {
@@ -2828,7 +2887,6 @@ function dhikr(kind) {
   let d = pick(list); if (d[0] === dhLast) d = list[(list.indexOf(d) + 1) % list.length];
   dhLast = d[0];
   const el = $('#dhikr'); el.innerHTML = `<span class="ar" lang="ar">${d[0]}</span><small>${d[1]} · ${d[2]}</small>`; el.classList.add('show'); dhT = 2.8;
-  sayAr(d[0]);
 }
 
 /* the menu line: next prayer */
@@ -2879,6 +2937,7 @@ function renderPrayer() {
   let h = `<span class="moonbig">${MOON}</span>`;
   if (PR.mode === 'lock') {
     h += `<p class="ar big-ar" lang="ar">حان وقت صلاة ${n[1]}</p><h2>It's time for ${n[0]}</h2><p class="rsub">Allahu Akbar! The game stops now. Go and pray. The game will wait for you.</p>`;
+    h += `<p class="rsub az" id="azState"></p><button class="mbtn cut az" id="azBtn" type="button" hidden></button>`;
     h += `<p class="eyebrow">Prayer break</p><div class="clock2" id="prClock"></div><button class="mbtn primary cut" id="prDone" type="button" disabled><b>I prayed</b><small id="prDoneSub"></small></button>`;
     h += tipHtml(p.fri ? T_JUMUAH : T_ADHAN) + tipHtml(T_DUA);
   } else if (PR.mode === 'ask') {
@@ -2892,30 +2951,32 @@ function renderPrayer() {
     h += `<div class="clock2" id="prClock"></div><button class="mbtn primary cut" id="prDone" type="button" disabled><b>I prayed</b><small id="prDoneSub"></small></button>`;
   }
   $('#prayCard').innerHTML = h;
+  const az = $('#azBtn');
+  if (az) { az.onclick = () => { if (AZ.playing) { AZ.muted = !AZ.muted; adhanEl().muted = AZ.muted; renderAdhanCtl(); } else playAdhan(); }; renderAdhanCtl(); }
   const yes = $('#prYes'), no = $('#prNo'), done = $('#prDone');
-  if (yes) yes.onclick = () => { audio(); sfx.ui(); markPrayed(p.key); sayAr('تقبّل الله'); afterPrayer(); };
+  if (yes) yes.onclick = () => { audio(); sfx.ui(); markPrayed(p.key); afterPrayer(); };
   if (no) no.onclick = () => { audio(); sfx.ui(); const t = Date.now(); PS.wait = { key: p.key, id: p.id, fri: p.fri, at: t, until: t + WAIT_MS, sunrise: p.sunrise || 0 }; savePS(); showPrayer('wait', PS.wait); };
   if (done) done.onclick = () => {
     if (done.disabled) return;
     audio(); sfx.ui(); markPrayed(p.key);
     if (PR.mode === 'lock') PS.lock = null; else PS.wait = null;
-    savePS(); sayAr('تقبّل الله'); afterPrayer();
+    savePS(); stopAdhan(); afterPrayer();
   };
   tickPrayer(now);
 }
 function tickPrayer(now) {   // the countdowns on the prayer screen
   const p = PR.p, clk = $('#prClock'), done = $('#prDone'), sub = $('#prDoneSub');
-  if (!p || !clk) return;
+  if (!p || !clk || !done) return;
   clk.textContent = mmss(p.until - now);
-  const ready = PR.mode === 'lock' ? p.at + EARLY_MS : p.until;
-  done.disabled = now < ready;
-  sub.textContent = now < ready ? (PR.mode === 'lock' ? 'You can tap this in ' : 'Ready in ') + mmss(ready - now) : 'Tap this after you pray';
+  const ready = PR.mode === 'lock' ? p.at + EARLY_MS : p.until, azOn = PR.mode === 'lock' && AZ.playing;
+  done.disabled = now < ready || azOn;
+  sub.textContent = now < ready ? (PR.mode === 'lock' ? 'You can tap this in ' : 'Ready in ') + mmss(ready - now) : azOn ? 'After the adhan finishes' : 'Tap this after you pray';
 }
 function enterLock(fresh) {   // the adhan: stop everything
   if (inGame()) { G.prev = G.state; G.state = 'paused'; G.prayPaused = true; touchReset(); }
   if (PR.mode !== 'ask' && PR.mode !== 'wait') PR.next = null;
   showPrayer('lock', PS.lock);
-  if (fresh) { audio(); sfx.adhan(); const n = pn(PS.lock); setTimeout(() => sayAr('الله أكبر، الله أكبر. حان الآن وقت صلاة ' + n[1]), 1200); }
+  if (fresh) playAdhan();
 }
 let prT = -1e9, prWarned = '';
 function prayerTick(t) {   // once a second
@@ -2957,7 +3018,7 @@ function preMatch(title, next) {
   pmNext = next; showScreen('#preMatch');
   const go = $('#pmGo'); go.disabled = true; clearTimeout(pmTimer); pmTimer = setTimeout(() => { go.disabled = false; }, 1200);
 }
-$('#pmGo').addEventListener('click', () => { if ($('#pmGo').disabled) return; audio(); sayAr('بسم الله'); const n = pmNext; pmNext = null; if (n) n(); });
+$('#pmGo').addEventListener('click', () => { if ($('#pmGo').disabled) return; audio(); const n = pmNext; pmNext = null; if (n) n(); });
 $('#pmBack').addEventListener('click', () => { sfx.ui(); pmNext = null; toMenu(); });
 
 /* prayer settings: city (or GPS in the installed app), method, Asr, break length, spoken dhikr */
@@ -2974,7 +3035,7 @@ function fillPrayerSet() {
   cs.innerHTML = o; cs.value = PS.src === 'gps' ? 'gps' : PS.city;
   $('#psMethod').innerHTML = Object.keys(PT.METHODS).map(k => `<option value="${k}">${esc(PT.METHODS[k].n)}</option>`).join('');
   $('#psMethod').value = PS.method; $('#psAsr').value = String(PS.asr); $('#psBrk').value = String(PS.brk);
-  $('#psSpeak').lastChild.textContent = PS.speak ? 'ON' : 'OFF';
+  renderAdhanCtl();
   renderPSTimes();
 }
 function renderPSTimes() {
@@ -3000,7 +3061,7 @@ $('#psCity').addEventListener('change', e => { if (e.target.value !== 'gps') { u
 $('#psMethod').addEventListener('change', e => { if (PT.METHODS[e.target.value]) PS.method = e.target.value; renderPSTimes(); });
 $('#psAsr').addEventListener('change', e => { PS.asr = e.target.value === '2' ? 2 : 1; renderPSTimes(); });
 $('#psBrk').addEventListener('change', e => { const v = +e.target.value; if (BREAKS.includes(v)) PS.brk = v; });
-$('#psSpeak').addEventListener('click', () => { PS.speak = !PS.speak; $('#psSpeak').lastChild.textContent = PS.speak ? 'ON' : 'OFF'; sfx.ui(); if (PS.speak) sayAr('سبحان الله'); });
+$('#psTest').addEventListener('click', () => { audio(); if (AZ.playing) stopAdhan(); else if (!PS.lock) playAdhan(); });
 $('#psGps').addEventListener('click', () => {
   const err = $('#psErr'), b = $('#psGps').lastChild; err.hidden = true;
   const fail = m => { err.textContent = m; err.hidden = false; b.textContent = 'GPS'; };
@@ -3124,6 +3185,7 @@ function tick(dt, now, auto) {   // one frame of game logic (auto: the player's 
     for (const c of cars) pickupPads(c);
     coachUpdate();
     recordBalls();
+    for (const c of cars) if (c.demoT > 0 && G.state !== 'paused') { c.demoT -= dt; if (c.demoT <= 0) respawnCar(c); }
     if (G.state === 'play') for (const b of balls) if (b.on && !b.live && b.respawnT > 0) { b.respawnT -= dt; if (b.respawnT <= 0) placeBall(b.spawnX, 7, 0, b); }   // multi-ball: a scored ball drops back in
   } else acc = 0;
   prayerTick(now);

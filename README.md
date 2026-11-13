@@ -10,7 +10,8 @@ The whole game is one self-contained `index.html` (three.js r128 and the fonts a
 - At every adhan the game stops, even mid-match, and locks for a prayer break (10 to 30 minutes; at least 40 minutes for Jumu'ah on Friday). The match waits and nobody loses rank for it.
 - Before playing, each player is asked whether they have prayed the current prayer. "Not yet" means: go pray first, then come back.
 - Every game starts with a Bismillah card: a reminder from the Quran or authentic hadith, the next prayer time, and a line that the game must never take prayer time.
-- Goals bring dhikr (Masha'Allah, SubhanAllah, Alhamdulillah), conceding brings "Khayran in sha' Allah" and "Qaddara Allahu wa ma sha'a fa'al", spoken aloud when the device has an Arabic voice.
+- At the adhan the game plays the full recorded adhan (`adhan.mp3`). It can be made silent but not skipped, and the game stays locked until it finishes.
+- Goals show dhikr on screen (Masha'Allah, SubhanAllah, Alhamdulillah); conceding shows "Khayran in sha' Allah" and "Qaddara Allahu wa ma sha'a fa'al".
 
 ## Install on a phone
 
@@ -24,6 +25,7 @@ Turn the phone's rotation lock off so the game can switch between portrait and l
 | File | Purpose |
 | --- | --- |
 | `index.html` | The game |
+| `adhan.mp3` | The adhan played at every prayer time |
 | `sw.js` | Offline cache: newest version when online, saved copy when offline |
 | `manifest.webmanifest` | Home-screen name, icon and full-screen mode |
 | `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` | App icons |
