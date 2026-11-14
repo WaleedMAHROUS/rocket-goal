@@ -1,7 +1,7 @@
 {
   "name": "Rocket Goal",
   "short_name": "Rocket Goal",
-  "description": "Car soccer that puts prayer first: ranked 1v1, 2v2 and 3v3, casual up to 4v4, up to 3 balls, 34 training levels, prayer times for your city.",
+  "description": "Car soccer that puts prayer first: ranked 1v1, 2v2 and 3v3, casual up to 4v4, 100 training levels, 10 cars, a shop for upgrades, prayer times for your city.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

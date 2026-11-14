@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Rocket Goal</title>
-<meta name="description" content="Car soccer that puts prayer first: ranked 1v1, 2v2 and 3v3, casual up to 4v4, up to 3 balls, 34 training levels, prayer times for your city.">
+<meta name="description" content="Car soccer that puts prayer first: ranked 1v1, 2v2 and 3v3, casual up to 4v4, 100 training levels, 10 cars, a shop for upgrades, prayer times for your city.">
 <meta name="theme-color" content="#060914">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -226,6 +226,21 @@ body.free #coach{top:calc(104px + var(--st))}
 .mbtn:disabled{opacity:.45;cursor:default}
 .mbtn:disabled:hover{transform:none;border-color:var(--line)}
 
+/* ---------- shop and coins ---------- */
+.upgs{display:flex;flex-direction:column;gap:8px}
+.upg{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);padding:10px 12px}
+.upg .um{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.upg .um b{font-size:17px}
+.upg .um small{color:var(--muted);font-weight:600;font-size:13px}
+.upg .pips{display:flex;gap:4px;margin-top:3px}
+.upg .pips i{width:22px;height:7px;background:rgba(255,255,255,.12);transform:skewX(-20deg)}
+.upg .pips i.on{background:var(--boost)}
+.upg .act{flex:none;min-width:86px}
+.scars{flex-wrap:wrap}.scars button{flex:1 1 30%}
+.coinhud{position:absolute;right:calc(14px + var(--sr, 0px));top:calc(54px + env(safe-area-inset-top, 0px));display:flex;gap:5px;align-items:center;font-family:var(--num);font-weight:700;font-size:16px;color:#ffc24a;text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none}
+.pop.coin i{color:#ffc24a}
+.coinsbd span:nth-child(even){color:#ffc24a}
+
 /* ---------- prayer first ---------- */
 .ar{font-family:var(--ar);direction:rtl;unicode-bidi:isolate;font-weight:400;line-height:1.6;letter-spacing:0;text-transform:none}
 .prayline{display:flex;align-items:center;gap:10px;background:rgba(46,150,96,.2);border:1px solid rgba(95,224,138,.5);padding:6px 14px;font-weight:700;font-size:15px;text-align:left;min-height:46px;color:var(--ink)}
@@ -331,6 +346,7 @@ body.free #coach{top:calc(104px + var(--st))}
   <div id="msg"></div>
   <div id="dhikr" aria-live="polite"></div>
   <div class="speedo" id="speedo">0 km/h</div>
+  <div class="coinhud" id="coinHudW"><span>◆</span><b id="coinHud">0</b></div>
   <div class="gauge" aria-label="Boost">
     <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="rgba(6,9,20,.72)" stroke="rgba(255,255,255,.1)" stroke-width="10" stroke-dasharray="235.6 314.2"/><circle id="boostArc" cx="60" cy="60" r="50" fill="none" stroke="#ffc24a" stroke-width="10" stroke-dasharray="78 314.2"/></svg>
     <div class="num"><span id="boostNum">33</span><small>BOOST</small></div>
@@ -349,7 +365,8 @@ body.free #coach{top:calc(104px + var(--st))}
       <button class="mbtn cut" data-go="casual" type="button"><b>Casual</b><small id="casualSub">1v1 to 4v4 · no rank</small></button>
       <button class="mbtn cut" data-go="challenges" type="button"><b>Training</b><small id="chalSub">Striker, Aerial, Goalie and Walls</small></button>
       <button class="mbtn cut" data-go="free" type="button"><b>Free Play</b><small>Practice with unlimited boost</small></button>
-      <button class="mbtn cut" data-go="garage" type="button"><b>Garage</b><small>Spend coins on your car</small></button>
+      <button class="mbtn cut" data-go="garage" type="button"><b>Garage</b><small>New cars, paint and wheels</small></button>
+      <button class="mbtn cut" data-go="shop" type="button"><b>Shop</b><small>Upgrade boost, speed and jump</small></button>
       <button class="mbtn cut" data-go="settings" type="button"><b>How to play</b><small>Controls and settings</small></button>
     </div>
   </div>
@@ -376,6 +393,19 @@ body.free #coach{top:calc(104px + var(--st))}
     <div class="tiles" id="tiles"></div>
     <div class="actbar"><span class="nm" id="actName"></span><button class="act" id="actBtn" type="button">Equip</button></div>
     <button class="mbtn cut" id="garageBack" type="button"><b>Back</b></button>
+  </div>
+</section>
+
+<section class="screen side" id="shop" hidden>
+  <div class="col">
+    <div class="profile"><h2 class="gtitle">Shop</h2><span class="coins" id="sCoins">0</span></div>
+    <p class="eyebrow">Your cars</p>
+    <div class="seg scars" id="sCars"></div>
+    <p class="rsub" id="sCar"></p>
+    <div class="upgs" id="sList"></div>
+    <p class="rsub">Coins come only from playing: wins, goals, saves, training and coins you pick up in the arena. Nothing here costs real money.</p>
+    <button class="mbtn cut" id="sGarage" type="button"><b>Get more cars</b><small>New cars are in the Garage</small></button>
+    <button class="mbtn cut" id="shopBack" type="button"><b>Back</b></button>
   </div>
 </section>
 
@@ -537,8 +567,16 @@ function sdBox(px, py, pz, bx, by, bz) {
   const ox = qx > 0 ? qx : 0, oy = qy > 0 ? qy : 0, oz = qz > 0 ? qz : 0;
   return Math.sqrt(ox * ox + oy * oy + oz * oz) + Math.min(Math.max(qx, qy, qz), 0);
 }
+/* Next to each goal the floor ramp shrinks away, so the back wall meets the floor at 90 degrees at the posts, like a real goal.
+   Far from the goal it is the normal curved ramp. Only the lower edges change; the ceiling edges keep their curve. */
+const GTAPER0 = GW / 2 + 0.3, GTAPER1 = GW / 2 + 9;
+function rampR(x, y) {
+  if (y >= H / 2) return RAD;
+  const t = clamp((Math.abs(x) - GTAPER0) / (GTAPER1 - GTAPER0), 0, 1);
+  return RAD * t * t * (3 - 2 * t);
+}
 function wallDist(x, y, z) {
-  let d = -sdRoundBox(x, y - H / 2, z, W / 2, H / 2, L / 2, RAD);
+  let d = -sdRoundBox(x, y - H / 2, z, W / 2, H / 2, L / 2, rampR(x, y));
   if (Math.abs(x) < GW / 2 + 3 && y < GH + 3) {
     const dg = -sdBox(x, y - GH / 2, Math.abs(z) - PCZ, GW / 2, GH / 2, PHZ);
     if (dg > d) d = dg;
@@ -564,6 +602,12 @@ const ITEMS = [
   mk('b_wedge', 'body', 'Interceptor', 400, 3, {}),
   mk('b_muscle', 'body', 'Thunder', 600, 5, {}),
   mk('b_truck', 'body', 'Bruiser', 800, 7, {}),
+  mk('b_dart', 'body', 'Dart', 1200, 10, {}),
+  mk('b_blade', 'body', 'Blade', 1500, 14, {}),
+  mk('b_rally', 'body', 'Rally', 1800, 18, {}),
+  mk('b_buggy', 'body', 'Dune', 2200, 24, {}),
+  mk('b_van', 'body', 'Tank', 2600, 30, {}),
+  mk('b_hyper', 'body', 'Phantom', 4000, 40, {}),
   mk('p_sunset', 'paint', 'Sunset', 0, 1, { b: 0xff8a1f, a: 0xff3fb4 }),
   mk('p_titan', 'paint', 'Titanium', 0, 1, { b: 0xe6eaf0, a: 0x1b1e26 }),
   mk('p_cobalt', 'paint', 'Cobalt', 150, 1, { b: 0x2a6bff, a: 0x10131a }),
@@ -575,36 +619,74 @@ const ITEMS = [
   mk('p_gold', 'paint', 'Solid Gold', 700, 8, { b: 0xf2b632, a: 0x8a5a00, m: 0.9, r: 0.2 }),
   mk('p_chrome', 'paint', 'Chrome', 900, 12, { b: 0xdfe6ee, a: 0x8a94a6, m: 1, r: 0.08 }),
   mk('p_galaxy', 'paint', 'Galaxy', 0, 15, { b: 0x1a1466, a: 0xff4fd8 }),
+  mk('p_aurora', 'paint', 'Aurora', 900, 20, { b: 0x18c8a8, a: 0x7a3cff }),
+  mk('p_lava', 'paint', 'Lava', 1000, 25, { b: 0x2a0d08, a: 0xff5a1f }),
+  mk('p_carbon', 'paint', 'Carbon', 1200, 30, { b: 0x22252b, a: 0xe6eaf0, m: 0.4, r: 0.45 }),
+  mk('p_pearl', 'paint', 'Pearl', 1300, 35, { b: 0xf6f1ea, a: 0xd8b56a, m: 0.6, r: 0.2 }),
+  mk('p_neon', 'paint', 'Neon Night', 0, 40, { b: 0x0b0d1a, a: 0x38ff9c }),
+  mk('p_desert', 'paint', 'Desert Storm', 1500, 45, { b: 0xc9a46a, a: 0x5a3b1a }),
+  mk('p_royal', 'paint', 'Royal', 1800, 55, { b: 0x1d2a8a, a: 0xf2b632, m: 0.7, r: 0.25 }),
+  mk('p_emerald', 'paint', 'Emerald', 2200, 65, { b: 0x0d8a4a, a: 0xd8f5e4, m: 0.8, r: 0.15 }),
+  mk('p_platinum', 'paint', 'Platinum', 2800, 80, { b: 0xcfd6df, a: 0x5ea4ff, m: 1, r: 0.1 }),
+  mk('p_legend', 'paint', 'Legend', 0, 100, { b: 0xf3f0ff, a: 0xffc24a, m: 0.9, r: 0.12 }),
   mk('t_std', 'trail', 'Standard', 0, 1, { c: [0xffd27a, 0xff7a1a] }),
   mk('t_ice', 'trail', 'Ice', 200, 1, { c: [0xbff3ff, 0x38b6ff] }),
   mk('t_toxic', 'trail', 'Toxic', 200, 2, { c: [0xd4ff5a, 0x38d430] }),
   mk('t_plasma', 'trail', 'Plasma', 350, 4, { c: [0xff8af5, 0x8a3cff] }),
   mk('t_gold', 'trail', 'Gold Rush', 500, 7, { c: [0xfff2a8, 0xf2b632] }),
   mk('t_rainbow', 'trail', 'Rainbow', 0, 10, { rb: 1 }),
+  mk('t_comet', 'trail', 'Comet', 900, 22, { c: [0xffffff, 0x5ea4ff] }),
+  mk('t_inferno', 'trail', 'Inferno', 1400, 35, { c: [0xffe14a, 0xff2a1a] }),
+  mk('t_nebula', 'trail', 'Nebula', 2000, 55, { c: [0x7afcff, 0xff4fd8] }),
+  mk('t_legend', 'trail', 'Golden Legend', 0, 90, { c: [0xffffff, 0xffc24a] }),
   mk('w_stock', 'wheel', 'Stock', 0, 1, { rim: 0xa8b0c0 }),
   mk('w_black', 'wheel', 'Blackout', 100, 1, { rim: 0x1a1c22 }),
   mk('w_gold', 'wheel', 'Gold', 300, 3, { rim: 0xf2b632 }),
   mk('w_neon', 'wheel', 'Neon', 350, 5, { rim: 0x18e0ff, glow: 1 }),
   mk('w_pink', 'wheel', 'Hot Pink', 350, 5, { rim: 0xff3fb4, glow: 1 }),
   mk('w_rainbow', 'wheel', 'Rainbow', 0, 12, { rim: 0xffffff, glow: 1, rb: 1 }),
+  mk('w_chrome', 'wheel', 'Chrome', 800, 20, { rim: 0xeef3ff }),
+  mk('w_carbon', 'wheel', 'Carbon', 1100, 33, { rim: 0x2c3038 }),
+  mk('w_lava', 'wheel', 'Lava', 1600, 48, { rim: 0xff5a1f, glow: 1 }),
   mk('h_none', 'topper', 'None', 0, 1, {}),
   mk('h_antenna', 'topper', 'Antenna', 100, 1, { ic: '📡' }),
   mk('h_halo', 'topper', 'Halo', 0, 2, { ic: '😇' }),
   mk('h_horns', 'topper', 'Horns', 300, 3, { ic: '😈' }),
   mk('h_tophat', 'topper', 'Top Hat', 400, 6, { ic: '🎩' }),
   mk('h_crown', 'topper', 'Crown', 1000, 9, { ic: '👑' }),
+  mk('h_star', 'topper', 'Star', 800, 16, { ic: '⭐' }),
+  mk('h_rocket', 'topper', 'Rocket', 1200, 28, { ic: '🚀' }),
+  mk('h_ball', 'topper', 'Football', 1500, 42, { ic: '⚽' }),
+  mk('h_trophy', 'topper', 'Trophy', 0, 75, { ic: '🏆' }),
   mk('g_classic', 'goalfx', 'Classic', 0, 1, {}),
   mk('g_fire', 'goalfx', 'Fireworks', 400, 3, { c: [0xff3b3b, 0xffd23b, 0x3bff8a, 0x3bb8ff, 0xff3bf0] }),
   mk('g_gold', 'goalfx', 'Gold Burst', 500, 6, { c: [0xfff2a8, 0xf2b632, 0xffffff] }),
   mk('g_ice', 'goalfx', 'Ice Storm', 500, 6, { c: [0xbff3ff, 0x38b6ff, 0xffffff] }),
   mk('g_nova', 'goalfx', 'Rainbow Nova', 0, 14, { rb: 1 }),
+  mk('g_bolt', 'goalfx', 'Lightning', 1600, 38, { c: [0xffffff, 0xfff27a, 0x7afcff] }),
+  mk('g_galaxy', 'goalfx', 'Galaxy Burst', 0, 60, { c: [0x7a3cff, 0xff4fd8, 0x38b6ff, 0xffffff] }),
   mk('p_opp', 'hidden', 'Rival', 0, 1, { b: 0x30343d, a: 0xff7a1a }),
   mk('p_mate', 'hidden', 'Teammate', 0, 1, { b: 0x2a5fd8, a: 0xe6eaf0 })
 ];
 const ITEM = {}; ITEMS.forEach(i => ITEM[i.id] = i);
 const TYPES = [['body', 'Cars'], ['paint', 'Paint'], ['trail', 'Boost'], ['wheel', 'Wheels'], ['topper', 'Topper'], ['goalfx', 'Goal FX']];
 const DIFFS = [['Rookie', 0], ['Semi-Pro', 2], ['Pro', 4], ['All-Star', 6]];
-const xpNeed = l => 300 + 120 * (l - 1);
+const MAX_LV = 100;
+const xpNeed = l => 250 + 35 * (l - 1);   // gentle enough that level 100 is a long goal, not an impossible one
+/* the Shop: upgrades for the car you drive, bought with coins earned in the game (there is no real money anywhere) */
+const UPG = [
+  { k: 'boost', n: 'Boost power', d: 'Boost pushes you harder', per: 0.05 },
+  { k: 'speed', n: 'Top speed', d: 'A higher top speed', per: 0.02 },
+  { k: 'jump', n: 'Jump', d: 'Jump higher', per: 0.025 },
+  { k: 'tank', n: 'Boost tank', d: 'Boost lasts longer', per: 0.10 }
+];
+const UPG_COST = [300, 600, 1000, 1600, 2500], UPG_MAX = UPG_COST.length;
+const BASE_ST = { boost: 1, speed: 1, jump: 1, tank: 1 };
+function carStats(sv, body) {
+  const u = (sv.up && sv.up[body]) || {}, st = {};
+  for (const g of UPG) st[g.k] = 1 + g.per * clamp(u[g.k] | 0, 0, UPG_MAX);
+  return st;
+}
 /* ================= training levels =================
    car: [x, z, yaw]   ball: [x, y, z]   v: ball velocity at "Go"   s: seconds for 3 and 2 stars
    hover: the ball floats until the first touch   save: keep it out of your own net until the clock runs out   coach: on-screen steps */
@@ -641,7 +723,7 @@ const PACKS = [
     { n: 'Lob', tip: 'Back up and jump to block it', save: 1, time: 6, car: [0, -GL + 16, 0], ball: [0, 2, -GL + 36], v: [0, 9, -13], s: [6, 6] },
     { n: 'Bouncing Shot', tip: 'Read the bounce', save: 1, time: 6, car: [10, -GL + 10, -0.6], ball: [-6, 5, -GL + 40], v: [2, 3, -16], s: [6, 6] },
     { n: 'Hard Low', tip: 'This one is fast. Move now!', save: 1, time: 6, car: [-10, -GL + 12, 0.7], ball: [6, BR, -GL + 46], v: [-2, 0, -26], s: [6, 6] },
-    { n: 'High Corner', tip: 'Slide along your goal line and jump', save: 1, time: 6, car: [9, -GL + 2.5, -Math.PI / 2], ball: [10, 2, -GL + 40], v: [-3.5, 7.1, -19], s: [6, 6] },
+    { n: 'High Corner', tip: 'Slide along your goal line and jump', save: 1, time: 6, car: [7, -GL + 2.5, -Math.PI / 2], ball: [10, 2, -GL + 40], v: [-3.5, 7.1, -19], s: [6, 6] },
     { n: 'Rebound', tip: 'Stay with it after it bounces', save: 1, time: 6, car: [8, -GL + 18, -0.5], ball: [0, 7, -GL + 22], v: [0, 1, -7], s: [6, 6] }
   ] },
   { id: 'walls', name: 'Walls', blurb: 'Walls, corners and bounces', levels: [
@@ -653,6 +735,10 @@ const PACKS = [
     { n: 'Ramp Pinch', tip: 'Smash it against the ramp, or just shoot', time: 15, car: [W / 2 - 16, GL - 34, 0.9], ball: [W / 2 - 5, BR, GL - 24], v: [3, 0, 0], s: [6, 10] }
   ] }
 ];
+/* after the first levels of each pack come harder ones: faster balls, higher aerials, faster shots at your net.
+   Each was checked by simulation to be beatable (by a bot, an aerial controller or, for saves, a found blocking position) and not to solve itself. */
+const EXTRA_LEVELS = {"striker":[{"n":"High Bouncer","tip":"Read the bounce and hit it on the way down","time":15,"car":[0,6,0],"ball":[6.39,9.05,29.38],"v":[-1.85,3.45,0.81],"s":[21.3,22.3]},{"n":"Chase Down","tip":"Catch it before it hits the wall","time":15,"car":[0,-30.6,0],"ball":[2.74,0.93,-8],"v":[-4.9,0,13.2],"s":[6.3,9.8]},{"n":"Rolling Cross","tip":"Meet it as it rolls across","time":15,"car":[-7.45,11.1,0],"ball":[23.8,0.93,38.46],"v":[-11.5,0,-1.51],"s":[16.0,17.0]},{"n":"Rolling Cross II","tip":"Meet it as it rolls across","time":15,"car":[-4.61,10.25,0],"ball":[-25.5,0.93,34.1],"v":[12.92,0,-0.35],"s":[21.5,22.5]},{"n":"High Bouncer II","tip":"Read the bounce and hit it on the way down","time":15,"car":[0,6,0],"ball":[6.99,10.04,31.37],"v":[-1.36,3.88,1.29],"s":[18.5,19.5]},{"n":"Rolling Cross III","tip":"Meet it as it rolls across","time":15,"car":[-1.89,10.25,0],"ball":[25.5,0.93,37.99],"v":[-12.92,0,0.97],"s":[4.1,7.6]},{"n":"Rolling Cross IV","tip":"Meet it as it rolls across","time":15,"car":[-5.55,9.4,0],"ball":[27.2,0.93,39.87],"v":[-14.33,0,-1.63],"s":[4.3,7.8]},{"n":"High Bouncer III","tip":"Read the bounce and hit it on the way down","time":15,"car":[0,6,0],"ball":[9.22,11.03,24.97],"v":[1.93,4.3,-3.93],"s":[18.6,19.6]},{"n":"Rolling Cross V","tip":"Meet it as it rolls across","time":15,"car":[4.38,9.4,0],"ball":[27.2,0.93,34.37],"v":[-14.33,0,1.39],"s":[4.1,7.6]},{"n":"High Bouncer IV","tip":"Read the bounce and hit it on the way down","time":15,"car":[0,6,0],"ball":[-4.71,12.02,31.93],"v":[-2.38,4.72,0.21],"s":[15.4,16.4]},{"n":"Return Fire","tip":"It is coming at you. Send it back!","time":15,"car":[-0.89,2,0],"ball":[2.95,2,44],"v":[-3.93,5.15,-15.75],"s":[21.5,22.5]},{"n":"Rolling Cross VI","tip":"Meet it as it rolls across","time":15,"car":[2.99,8.55,0],"ball":[-28.9,0.93,35.58],"v":[15.75,0,1.71],"s":[4.1,7.6]},{"n":"Chase Down II","tip":"Catch it before it hits the wall","time":15,"car":[0,-32.3,0],"ball":[-9.99,0.93,-8],"v":[7.45,0,16.6],"s":[6.6,10.1]},{"n":"Chase Down III","tip":"Catch it before it hits the wall","time":15,"car":[0,-32.87,0],"ball":[11.3,0.93,-8],"v":[-8.3,0,17.73],"s":[6.8,10.3]},{"n":"Rolling Cross VII","tip":"Meet it as it rolls across","time":15,"car":[-6.63,7.7,0],"ball":[30.6,0.93,32.63],"v":[-17.17,0,0.93],"s":[4.4,7.9]},{"n":"Chase Down IV","tip":"Catch it before it hits the wall","time":15,"car":[0,-32.87,0],"ball":[9.03,0.93,-8],"v":[-8.3,0,17.73],"s":[7.0,10.5]},{"n":"High Bouncer V","tip":"Read the bounce and hit it on the way down","time":15,"car":[0,6,0],"ball":[8.12,14.01,27.17],"v":[-0.67,5.58,1.67],"s":[17.6,18.6]},{"n":"Chase Down V","tip":"Catch it before it hits the wall","time":15,"car":[0,-33.43,0],"ball":[11.27,0.93,-8],"v":[-9.15,0,18.87],"s":[7.3,10.8]},{"n":"Rolling Cross VIII","tip":"Meet it as it rolls across","time":15,"car":[-0.74,6,0],"ball":[-34,0.93,38.95],"v":[20,0,-1.26],"s":[4.2,7.7]},{"n":"Tight Angle","tip":"Come round and shoot from the side","time":14,"car":[34,24,-0.32],"ball":[26,0.93,48],"s":[20.0,21.0]}],"aerial":[{"n":"Sky Drop","tip":"Meet it before it lands","time":15,"car":[0.66,16,0],"ball":[7.23,15.98,35.02],"v":[-1.42,0,1.96],"s":[17.9,18.9]},{"n":"Volley Cross","tip":"Hit the cross in the air","time":15,"car":[1.91,22,0],"ball":[-30,3,45.02],"v":[10.22,10.22,0.47],"s":[18.7,19.7]},{"n":"Sky Drop II","tip":"Meet it before it lands","time":15,"car":[0.66,16,0],"ball":[7.23,15.98,35.02],"v":[-1.42,0,1.96],"s":[17.9,18.9]},{"n":"Pop Fly II","tip":"Watch it go up, then fly to it","time":15,"car":[0,16,0],"ball":[6.38,1.2,32],"v":[-1.9,15.17,-0.21],"s":[6.5,10.0]},{"n":"Sky Drop III","tip":"Meet it before it lands","time":15,"car":[5.3,16,0],"ball":[2.34,16.73,34.27],"v":[-2.24,0,0.45],"s":[18.0,19.0]},{"n":"Sky Drop IV","tip":"Meet it before it lands","time":15,"car":[3.59,16,0],"ball":[-2.73,16.73,34.27],"v":[0.63,0,0.11],"s":[17.5,18.5]},{"n":"Volley Cross II","tip":"Hit the cross in the air","time":15,"car":[-1.08,22,0],"ball":[30,3,43.89],"v":[-11.64,11.64,-0.4],"s":[21.5,22.5]},{"n":"Sky Drop V","tip":"Meet it before it lands","time":15,"car":[-5.31,16,0],"ball":[-3.9,17.11,33.89],"v":[-0.94,0,-1.76],"s":[17.3,18.3]},{"n":"Float","tip":"Fly up and hit it in","hover":1,"time":15,"car":[0.2,21.13,0],"ball":[-10.42,14.45,38.27],"s":[17.2,18.2]},{"n":"Volley Cross III","tip":"Hit the cross in the air","time":15,"car":[0.06,22,0],"ball":[30,3,43.13],"v":[-12.58,12.58,-0.07],"s":[17.7,18.7]},{"n":"Pop Fly III","tip":"Watch it go up, then fly to it","time":15,"car":[0,16,0],"ball":[2.57,1.2,32],"v":[-0.84,16.58,0.23],"s":[19.8,20.8]},{"n":"Volley Cross IV","tip":"Hit the cross in the air","time":15,"car":[-3.73,22,0],"ball":[-30,3,42.76],"v":[13.06,13.06,0.95],"s":[21.5,22.5]},{"n":"Pop Fly IV","tip":"Watch it go up, then fly to it","time":15,"car":[0,16,0],"ball":[-2.79,1.2,32],"v":[1.01,17.06,0.61],"s":[16.7,17.7]},{"n":"Sky Drop VI","tip":"Meet it before it lands","time":15,"car":[3.37,16,0],"ball":[-6.66,18.24,32.76],"v":[-2.4,0,1.98],"s":[11.4,14]},{"n":"Pop Fly V","tip":"Watch it go up, then fly to it","time":15,"car":[0,16,0],"ball":[0.18,1.2,32],"v":[0.33,17.53,1.56],"s":[17.9,18.9]},{"n":"Volley Cross V","tip":"Hit the cross in the air","time":15,"car":[2.85,22,0],"ball":[30,3,42.38],"v":[-13.53,13.53,-0.13],"s":[17.9,18.9]},{"n":"Sky Drop VII","tip":"Meet it before it lands","time":15,"car":[1.45,16,0],"ball":[-4.21,18.62,32.38],"v":[0.1,0,-0.66],"s":[21.2,22.2]},{"n":"Pop Fly VI","tip":"Watch it go up, then fly to it","time":15,"car":[0,16,0],"ball":[-5.12,1.2,32],"v":[0.87,18,0.8],"s":[4.7,8.2]},{"n":"Sky Drop VIII","tip":"Meet it before it lands","time":15,"car":[4.96,16,0],"ball":[-4.54,19,32],"v":[-1.95,0,-0.14],"s":[19.0,20.0]},{"n":"Float II","tip":"Fly up and hit it in","hover":1,"time":15,"car":[1.81,20,0],"ball":[14.66,17,36],"s":[17.6,18.6]}],"goalie":[{"n":"Corner Rocket","tip":"Fast and low. Move now!","save":1,"time":6,"car":[-3.59,-46.43,0.11],"ball":[-0.64,0.93,-18.8],"v":[3.39,0,-20.67],"s":[6,6]},{"n":"Skipper","tip":"It skips off the floor. Read it","save":1,"time":6,"car":[-9.96,-47.14,0.61],"ball":[11.64,5,-16],"v":[-1.63,2.45,-18.35],"s":[6,6]},{"n":"Skipper II","tip":"It skips off the floor. Read it","save":1,"time":6,"car":[6.71,-45.11,-0.28],"ball":[-1.07,3,-18],"v":[-1.1,1.3,-18.35],"s":[6,6]},{"n":"Corner Rocket II","tip":"Fast and low. Move now!","save":1,"time":6,"car":[-0.21,-44.72,0.26],"ball":[7.2,0.93,-17.1],"v":[-1.36,0,-23.67],"s":[6,6]},{"n":"Skipper III","tip":"It skips off the floor. Read it","save":1,"time":6,"car":[2.73,-42.13,-0.11],"ball":[0.11,3,-18],"v":[-0.91,1.73,-20.26],"s":[6,6]},{"n":"Corner Rocket III","tip":"Fast and low. Move now!","save":1,"time":6,"car":[4.18,-46.61,-0.54],"ball":[-14.05,0.93,-16.25],"v":[10.15,0,-22.95],"s":[6,6]},{"n":"Skipper IV","tip":"It skips off the floor. Read it","save":1,"time":6,"car":[4.15,-43.09,-0.37],"ball":[-5.64,3,-18],"v":[3.77,1.94,-21.22],"s":[6,6]},{"n":"Corner Rocket IV","tip":"Fast and low. Move now!","save":1,"time":6,"car":[-9.85,-49.84,0.53],"ball":[11.06,0.93,-14.55],"v":[-10.29,0,-25.89],"s":[6,6]},{"n":"Skipper V","tip":"It skips off the floor. Read it","save":1,"time":6,"car":[6.31,-47.32,0.14],"ball":[10.53,3,-18],"v":[-7.91,2.36,-23.13],"s":[6,6]},{"n":"Corner Rocket V","tip":"Fast and low. Move now!","save":1,"time":6,"car":[-3.18,-47.42,-0.12],"ball":[-7.48,0.93,-12.85],"v":[0.33,0,-30.62],"s":[6,6]},{"n":"Skipper VI","tip":"It skips off the floor. Read it","save":1,"time":6,"car":[4.6,-43.68,-0.45],"ball":[-7.93,3,-18],"v":[8.04,2.79,-25.04],"s":[6,6]},{"n":"Corner Rocket VI","tip":"Fast and low. Move now!","save":1,"time":6,"car":[-3.12,-47.48,-0.02],"ball":[-3.82,0.93,-12],"v":[6.84,0,-31.26],"s":[6,6]}],"walls":[{"n":"Back Wall","tip":"It bounces off the wall above the net","time":15,"car":[0,22,0],"ball":[-1.29,3,44],"v":[-0.2,9.6,13.75],"s":[18.0,19.0]},{"n":"Corner Chaos","tip":"Wait for it to come out of the corner","time":15,"car":[10,22,0.3],"ball":[30,2,46],"v":[8.75,6.45,6.45],"s":[12.0,14]},{"n":"Wall Ball II","tip":"Let it come down off the wall","time":15,"car":[0,18,0],"ball":[-19.75,0.93,31.36],"v":[-18.33,0,2.58],"s":[17.5,18.5]},{"n":"Side Wall Pass II","tip":"It comes off the side wall to you","time":15,"car":[0,18,0],"ball":[38,8.17,36.83],"v":[-6.46,2.58,1.12],"s":[13.6,14.6]},{"n":"Ceiling Drop II","tip":"It falls from the roof","time":15,"car":[0,16,0],"ball":[2.62,18,35.67],"v":[0.93,0,0.63],"s":[18.0,19.0]},{"n":"Side Wall Pass III","tip":"It comes off the side wall to you","time":15,"car":[0,18,0],"ball":[38,8.73,36.27],"v":[-7.17,2.87,-0.46],"s":[15.2,16.2]},{"n":"Corner Chaos II","tip":"Wait for it to come out of the corner","time":15,"car":[10,22,0.3],"ball":[30,2,46],"v":[10.17,7.3,7.3],"s":[15.5,16.5]},{"n":"Side Wall Pass IV","tip":"It comes off the side wall to you","time":15,"car":[0,18,0],"ball":[38,8.73,36.27],"v":[-7.17,2.87,1.43],"s":[13.0,14]},{"n":"Ceiling Drop III","tip":"It falls from the roof","time":15,"car":[0,16,0],"ball":[2.26,18,33.4],"v":[3.09,0,2.55],"s":[21.5,22.5]},{"n":"Corner Chaos III","tip":"Wait for it to come out of the corner","time":15,"car":[10,22,0.3],"ball":[30,2,46],"v":[10.88,7.73,7.73],"s":[11.8,14]},{"n":"Side Wall Pass V","tip":"It comes off the side wall to you","time":15,"car":[0,18,0],"ball":[38,9.3,35.7],"v":[-7.87,3.15,-1.46],"s":[20.0,21.0]},{"n":"Ceiling Drop IV","tip":"It falls from the roof","time":15,"car":[0,16,0],"ball":[-9.44,18,32.27],"v":[-0.11,0,1.11],"s":[14.7,15.7]},{"n":"Ceiling Drop V","tip":"It falls from the roof","time":15,"car":[0,16,0],"ball":[-5.91,18,32.27],"v":[-1.41,0,2.56],"s":[20.8,21.8]},{"n":"Side Wall Pass VI","tip":"It comes off the side wall to you","time":15,"car":[0,18,0],"ball":[-38,11,34],"v":[10,4,0.16],"s":[17.1,18.1]}]};
+for (const pk of PACKS) pk.levels.push(...(EXTRA_LEVELS[pk.id] || []));
 const LEVEL = {};
 PACKS.forEach(pk => pk.levels.forEach((lv, i) => { lv.key = pk.id + '-' + i; lv.pack = pk; lv.i = i; LEVEL[lv.key] = lv; }));
 const LEVEL_COUNT = Object.keys(LEVEL).length;
@@ -667,7 +753,7 @@ const blankRank = () => ({ rank: 0, wins: 0, W: 0, L: 0 });
 const PRAYED_RE = /^\d{4}-\d\d-\d\d:(fajr|dhuhr|asr|maghrib|isha)$/;
 function blankSave() {
   return { rank: 0, wins: 0, W: 0, L: 0, ranks: { 1: blankRank(), 2: blankRank(), 3: blankRank() },
-    rts: 1, rnb: 1, cts: 1, cnb: 1, prayed: {}, tip: 0,
+    rts: 1, rnb: 1, cts: 1, cnb: 1, prayed: {}, tip: 0, up: {},
     level: 1, xp: 0, coins: 150, owned: {}, chal: {}, sound: true, diff: 0, cam: true,
     eq: { body: 'b_hatch', paint: 'p_sunset', trail: 't_std', wheel: 'w_stock', topper: 'h_none', goalfx: 'g_classic' } };
 }
@@ -682,13 +768,16 @@ function cleanSave(src) {   // fill gaps and drop unknown items, so an old, part
     if (src.ranks && typeof src.ranks === 'object') {
       for (const p of PL) { const r = src.ranks[p]; if (r && typeof r === 'object') for (const f in d.ranks[p]) if (Number.isFinite(r[f])) d.ranks[p][f] = r[f]; }
     } else for (const f in d.ranks[1]) if (Number.isFinite(src[f])) d.ranks[1][f] = src[f];   // saved before team playlists: the old rank is the 1v1 rank
+    if (src.up && typeof src.up === 'object') for (const b in src.up) if (BODIES[b] && src.up[b] && typeof src.up[b] === 'object') {
+      d.up[b] = {}; for (const g of UPG) d.up[b][g.k] = clamp(src.up[b][g.k] | 0, 0, UPG_MAX);
+    }
     if (src.prayed && typeof src.prayed === 'object') {
       const keys = Object.keys(src.prayed).filter(k => PRAYED_RE.test(k)).sort().slice(-15);
       for (const k of keys) d.prayed[k] = +src.prayed[k] || 1;
     }
   }
   for (const p of PL) { const r = d.ranks[p]; r.rank = clamp(r.rank | 0, 0, 7); r.wins = Math.max(0, r.wins | 0); r.W = Math.max(0, r.W | 0); r.L = Math.max(0, r.L | 0); }
-  d.level = Math.max(1, d.level | 0); d.xp = Math.max(0, d.xp | 0); d.coins = Math.max(0, d.coins | 0); d.diff = clamp(d.diff | 0, 0, DIFFS.length - 1);
+  d.level = clamp(d.level | 0, 1, MAX_LV); d.xp = Math.max(0, d.xp | 0); d.coins = Math.max(0, d.coins | 0); d.diff = clamp(d.diff | 0, 0, DIFFS.length - 1);
   d.rts = clamp(d.rts | 0, 1, 3); d.rnb = clamp(d.rnb | 0, 1, 3); d.cts = clamp(d.cts | 0, 1, 4); d.cnb = clamp(d.cnb | 0, 1, 3); d.tip = Math.max(0, d.tip | 0);
   mirrorRank(d);
   return d;
@@ -807,17 +896,18 @@ const BLUE = new Col(0x2f7cff), ORANGE = new Col(0xff7a1a), WHITE = new Col(1, 1
 function arenaGeometry() {
   const g = new THREE.BoxGeometry(W, H, L, 120, 28, 150);
   const p = g.attributes.position, v = new V3(), c = new V3(), d = new V3();
-  const bx = W / 2 - RAD, by = H / 2 - RAD, bz = L / 2 - RAD;
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i);
+    const r = rampR(v.x, v.y + H / 2), bx = W / 2 - r, by = H / 2 - r, bz = L / 2 - r;
     c.set(clamp(v.x, -bx, bx), clamp(v.y, -by, by), clamp(v.z, -bz, bz));
     d.copy(v).sub(c);
-    if (d.lengthSq() > 1e-9) { d.normalize().multiplyScalar(RAD); v.copy(c).add(d); }
+    if (d.lengthSq() > 1e-9) { d.normalize().multiplyScalar(r); v.copy(c).add(d); }
     p.setXYZ(i, v.x, v.y + H / 2, v.z);
   }
   return g;
 }
-const GLSL_CONST = `const float W=${W.toFixed(1)},H=${H.toFixed(1)},L=${L.toFixed(1)},R=${RAD.toFixed(1)},GW=${GW.toFixed(1)},GH=${GH.toFixed(2)};`;
+const GLSL_CONST = `const float W=${W.toFixed(1)},H=${H.toFixed(1)},L=${L.toFixed(1)},R=${RAD.toFixed(1)},GW=${GW.toFixed(1)},GH=${GH.toFixed(2)};
+  float rampR(vec3 p){ if(p.y>=H*0.5) return R; return max(0.05,R*smoothstep(${GTAPER0.toFixed(2)},${GTAPER1.toFixed(2)},abs(p.x))); }`;
 const VS = `varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
 const arenaMat = new THREE.ShaderMaterial({
   side: THREE.BackSide,
@@ -828,9 +918,10 @@ const arenaMat = new THREE.ShaderMaterial({
   float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
   void main(){
     vec3 p=vW;
-    if(abs(p.x)<GW*0.5 && p.y<GH && abs(p.z)>L*0.5-R) discard;
+    if(abs(p.x)<GW*0.5 && p.y<GH && abs(p.z)>L*0.5-0.02) discard;
     vec3 lp=p-vec3(0.0,H*0.5,0.0);
-    vec3 inner=vec3(W*0.5-R,H*0.5-R,L*0.5-R);
+    float rr=rampR(p);
+    vec3 inner=vec3(W*0.5-rr,H*0.5-rr,L*0.5-rr);
     vec3 n=-normalize(lp-clamp(lp,-inner,inner));
     vec3 team=mix(uBlue,uOrange,smoothstep(-6.0,6.0,p.z));
     float fl=smoothstep(0.8,0.985,n.y), ce=smoothstep(0.8,0.985,-n.y);
@@ -886,7 +977,7 @@ function goalMat(col, isFloor) {
     float sdRB(vec3 p,vec3 b,float r){ vec3 q=abs(p)-b+r; return length(max(q,0.0))+min(max(q.x,max(q.y,q.z)),0.0)-r; }
     void main(){
       vec3 p=vW;
-      if(sdRB(p-vec3(0.0,H*0.5,0.0),vec3(W*0.5,H*0.5,L*0.5),R)<-0.04) discard;
+      if(sdRB(p-vec3(0.0,H*0.5,0.0),vec3(W*0.5,H*0.5,L*0.5),rampR(p))<-0.04) discard;
       if(uFloor>0.5){
         float s=step(0.5,fract((p.x+p.z)/1.4));
         vec3 c=mix(vec3(0.07,0.24,0.11),uCol*0.35,0.25+0.12*s);
@@ -999,6 +1090,53 @@ const BODIES = {
     hl: [0.04, 0.666, 0.14], tl: [0.06, -0.646], roof: [0.322, -0.18]
   }
 };
+Object.assign(BODIES, {
+  b_dart: {   // long, low wedge with a big wing
+    body: [[-0.66, -0.12], [0.64, -0.12], [0.7, -0.09], [0.69, -0.05], [0.2, 0.04], [-0.3, 0.075], [-0.62, 0.08], [-0.67, 0.05], [-0.68, -0.06]],
+    glass: [[0.2, 0.045], [-0.02, 0.17], [-0.3, 0.18], [-0.5, 0.09], [-0.48, 0.075]], gw: 0.6,
+    acc: [[[[0.2, 0.06], [0.66, -0.035], [0.66, -0.022], [0.2, 0.073]], 0.2, 0]],
+    box: [['a', 0.86, 0.02, 0.16, 0, 0.2, -0.6, -0.1], ['d', 0.03, 0.11, 0.04, 0.3, 0.14, -0.58, 0, 1], ['d', 0.8, 0.03, 0.08, 0, -0.11, 0.68], ['d', 0.74, 0.05, 0.06, 0, -0.09, -0.68]],
+    hl: [-0.06, 0.7, 0.15], tl: [0.02, -0.684], roof: [0.19, -0.2]
+  },
+  b_blade: {   // very flat and wide-looking
+    body: [[-0.66, -0.12], [0.66, -0.12], [0.71, -0.1], [0.7, -0.07], [0.4, -0.01], [-0.2, 0.02], [-0.62, 0.03], [-0.68, 0.0], [-0.69, -0.08]],
+    glass: [[0.32, 0.0], [0.12, 0.12], [-0.2, 0.13], [-0.4, 0.04], [-0.38, 0.02]], gw: 0.56,
+    acc: [[[[0.4, 0.0], [0.68, -0.07], [0.68, -0.058], [0.4, 0.012]], 0.5, 0]],
+    box: [['a', 0.9, 0.015, 0.12, 0, 0.12, -0.64, 0], ['d', 0.025, 0.1, 0.03, 0.25, 0.07, -0.62, 0, 1], ['d', 0.84, 0.02, 0.1, 0, -0.115, 0.7], ['d', 0.02, 0.04, 0.9, 0.4, -0.1, 0, 0, 1]],
+    hl: [-0.075, 0.705, 0.17], tl: [-0.01, -0.69], roof: [0.135, -0.05]
+  },
+  b_rally: {   // hatchback with a rally wing and stripes
+    body: [[-0.58, -0.12], [0.58, -0.12], [0.63, -0.07], [0.63, 0.01], [0.56, 0.06], [0.2, 0.09], [-0.52, 0.11], [-0.59, 0.08], [-0.6, -0.05]],
+    glass: [[0.2, 0.095], [0.0, 0.26], [-0.44, 0.27], [-0.55, 0.2], [-0.54, 0.11]], gw: 0.72,
+    acc: [[[[0.2, 0.11], [0.6, 0.075], [0.6, 0.09], [0.2, 0.125]], 0.1, 0.12], [[[0.2, 0.11], [0.6, 0.075], [0.6, 0.09], [0.2, 0.125]], 0.1, -0.12]],
+    box: [['a', 0.8, 0.02, 0.18, 0, 0.32, -0.56, -0.15], ['d', 0.025, 0.08, 0.03, 0.2, 0.28, -0.54, 0, 1], ['d', 0.16, 0.04, 0.12, 0, 0.285, -0.05],
+      ['d', 0.84, 0.06, 0.06, 0, -0.1, 0.62], ['d', 0.84, 0.06, 0.06, 0, -0.1, -0.6], ['h', 0.08, 0.03, 0.015, 0.12, 0.29, 0.06, 0, 1]],
+    hl: [0.0, 0.636, 0.16], tl: [0.04, -0.606], roof: [0.3, -0.2]
+  },
+  b_buggy: {   // dune buggy with a roll cage
+    body: [[-0.58, -0.12], [0.6, -0.12], [0.66, -0.06], [0.62, 0.02], [0.3, 0.04], [-0.3, 0.05], [-0.56, 0.06], [-0.6, 0.03], [-0.6, -0.06]],
+    glass: [[0.3, 0.045], [0.18, 0.2], [0.15, 0.2], [0.26, 0.045]], gw: 0.6,
+    acc: [[[[-0.3, 0.06], [0.3, 0.05], [0.3, 0.064], [-0.3, 0.074]], 0.6, 0]],
+    box: [['d', 0.03, 0.26, 0.03, 0.3, 0.18, -0.15, 0, 1], ['d', 0.03, 0.22, 0.03, 0.3, 0.16, -0.48, 0, 1], ['d', 0.03, 0.03, 0.36, 0.3, 0.31, -0.31, 0, 1],
+      ['d', 0.62, 0.03, 0.03, 0, 0.31, -0.15], ['a', 0.2, 0.12, 0.14, 0.13, 0.11, -0.26, 0, 1], ['d', 0.7, 0.05, 0.05, 0, -0.06, 0.66]],
+    hl: [0.0, 0.65, 0.13], tl: [0.02, -0.606], roof: [0.34, -0.3]
+  },
+  b_van: {   // tall and boxy, with a roof rack
+    body: [[-0.6, -0.12], [0.6, -0.12], [0.64, -0.08], [0.64, 0.1], [0.58, 0.14], [0.3, 0.16], [-0.58, 0.17], [-0.62, 0.14], [-0.62, -0.07]],
+    glass: [[0.3, 0.165], [0.22, 0.32], [-0.56, 0.33], [-0.6, 0.3], [-0.6, 0.17]], gw: 0.76,
+    acc: [[[[0.3, 0.18], [0.6, 0.155], [0.6, 0.168], [0.3, 0.193]], 0.5, 0]],
+    box: [['d', 0.7, 0.025, 0.6, 0, 0.35, -0.15], ['d', 0.02, 0.04, 0.6, 0.33, 0.37, -0.15, 0, 1], ['d', 0.7, 0.08, 0.05, 0, -0.02, 0.67],
+      ['d', 0.84, 0.07, 0.07, 0, -0.09, -0.63], ['b', 0.012, 0.2, 0.4, 0.385, 0.22, -0.2, 0, 1]],
+    hl: [0.06, 0.646, 0.15], tl: [0.08, -0.626], roof: [0.36, -0.15]
+  },
+  b_hyper: {   // low hypercar with twin fins
+    body: [[-0.64, -0.12], [0.62, -0.12], [0.68, -0.09], [0.67, -0.04], [0.45, 0.02], [0.05, 0.07], [-0.35, 0.08], [-0.6, 0.06], [-0.66, 0.02], [-0.66, -0.07]],
+    glass: [[0.3, 0.045], [0.08, 0.19], [-0.22, 0.2], [-0.42, 0.09], [-0.4, 0.075]], gw: 0.58,
+    acc: [[[[0.45, 0.025], [0.66, -0.04], [0.66, -0.027], [0.45, 0.038]], 0.62, 0]],
+    box: [['a', 0.015, 0.12, 0.25, 0.18, 0.14, -0.48, 0, 1], ['d', 0.7, 0.04, 0.08, 0, -0.1, -0.66], ['d', 0.012, 0.07, 0.16, 0.39, 0.0, -0.12, 0, 1], ['d', 0.86, 0.015, 0.1, 0, -0.12, 0.68]],
+    hl: [-0.045, 0.676, 0.17], tl: [0.0, -0.664], roof: [0.21, -0.1]
+  }
+});
 const geoCache = {};
 function bodyGeo(id) {
   if (geoCache[id]) return geoCache[id];
@@ -1150,6 +1288,7 @@ class Car {
     this.n = new V3(0, 1, 0); this.in = Object.assign({}, ZERO_IN); this.active = true;
     this.mesh = makeCar(team === 0 ? 0x2f7cff : 0xff7a1a, lite); this.shadow = blob(1.8);
     this.trail = ITEM.t_std.d; this.gfx = ITEM.g_classic.d; this.rb = false;
+    this.st = BASE_ST;   // shop upgrades (only your car has any)
     this.role = 'attacker'; this.tball = null; this.slot = 0; this.tag = null; this.touchBall = null;   // team play: job, target ball, side offset, name tag
     this.resetState();
   }
@@ -1162,6 +1301,7 @@ class Car {
   place(x, z, yaw) { this.resetState(); this.pos.set(x, RIDE, z); this.q.setFromAxisAngle(UP, yaw); this.axes(); }
   axes() { this.fwd.set(0, 0, 1).applyQuaternion(this.q); this.up.set(0, 1, 0).applyQuaternion(this.q); this.left.set(1, 0, 0).applyQuaternion(this.q); }
   dress(eq) {
+    if (this === player && eq === S.eq) this.st = carStats(S, S.eq.body);
     const m = this.mesh, p = ITEM[eq.paint].d, w = ITEM[eq.wheel].d, bid = BODIES[eq.body] ? eq.body : 'b_hatch';
     if (m.bodyId !== bid) buildBody(m, bid);
     m.body.color.setHex(p.b); m.accent.color.setHex(p.a);
@@ -1185,17 +1325,17 @@ function stepCar(c, dt) {
   const jumpPress = I.jump && !c.prevJump; c.prevJump = I.jump;
   c.hitCD -= dt; c.groundCD -= dt;
   const boosting = I.boost && c.boost > 0;
-  if (boosting && !G.infBoost) c.boost = Math.max(0, c.boost - 33.3 * dt);
+  if (boosting && !G.infBoost) c.boost = Math.max(0, c.boost - 33.3 / c.st.tank * dt);
   c.boosting = boosting;
   if (c.grounded) {
     if (jumpPress) {
-      c.vel.addScaledVector(c.up, 2.92);
+      c.vel.addScaledVector(c.up, 2.92 * c.st.jump);
       c.grounded = false; c.jumped = true; c.jumpT = 0; c.holdT = 0.2; c.dodged = false; c.airFlip = false; c.groundCD = 0.12; c.ev = 'jump';
     } else driveGround(c, I, dt, boosting);
   }
   if (!c.grounded) airControl(c, I, dt, boosting, jumpPress);
   c.vel.y -= GRAV * dt;
-  const sp = c.vel.length(); if (sp > MAXV) c.vel.multiplyScalar(MAXV / sp);
+  const sp = c.vel.length(), vmax = MAXV * c.st.speed; if (sp > vmax) c.vel.multiplyScalar(vmax / sp);
   c.pos.addScaledVector(c.vel, dt);
   if (!c.grounded) {
     const ang = c.w.length();
@@ -1215,7 +1355,7 @@ function driveGround(c, I, dt, boosting) {
     if (thr * vf < 0 && Math.abs(vf) > 0.1) a = Math.sign(thr) * 35;
     else { const s = Math.abs(vf); a = thr * (s < 14 ? 16 * (1 - 0.9 * s / 14) : 0); }
   } else if (Math.abs(vf) > 1e-3) a = -Math.sign(vf) * Math.min(5.25, Math.abs(vf) / dt);
-  if (boosting) a += 9.91;
+  if (boosting) a += 9.91 * c.st.boost;
   c.vel.addScaledVector(c.fwd, a * dt);
   const vl = c.vel.dot(c.left);
   c.vel.addScaledVector(c.left, -vl * (1 - Math.exp(-(I.hb ? 1.1 : 14) * dt)));
@@ -1224,14 +1364,14 @@ function driveGround(c, I, dt, boosting) {
 }
 function airControl(c, I, dt, boosting, jumpPress) {
   c.jumpT += dt;
-  if (c.holdT > 0) { if (I.jump) { c.vel.addScaledVector(c.up, 14.6 * dt); c.holdT -= dt; } else c.holdT = 0; }
+  if (c.holdT > 0) { if (I.jump) { c.vel.addScaledVector(c.up, 14.6 * c.st.jump * dt); c.holdT -= dt; } else c.holdT = 0; }
   if (jumpPress && c.holdT <= 0 && !c.dodged && (c.airFlip || (c.jumped && c.jumpT < 1.45))) {
     const fx = I.pitch, sx = I.steer, mag = Math.hypot(fx, sx);
     if (mag > 0.5) { dodge(c, fx / Math.max(mag, 1), sx / Math.max(mag, 1)); c.ev = 'dodge'; }
-    else { c.vel.addScaledVector(c.up, 2.92); c.ev = 'jump'; }
+    else { c.vel.addScaledVector(c.up, 2.92 * c.st.jump); c.ev = 'jump'; }
     c.dodged = true; c.airFlip = false;
   }
-  if (boosting) c.vel.addScaledVector(c.fwd, 9.91 * dt);
+  if (boosting) c.vel.addScaledVector(c.fwd, 9.91 * c.st.boost * dt);
   tq.copy(c.q).invert();
   const wl = tA.copy(c.w).applyQuaternion(tq);
   // ap/ay/ar are the player's air-rotation inputs after the take-off latch (see pollInput); bots leave them null
@@ -1759,7 +1899,7 @@ function startMatch(mode, o) {
   o = o || {};
   const ts = mode === 'free' ? 1 : clamp((o.ts | 0) || 1, 1, mode === 'ranked' ? 3 : 4), nb = mode === 'free' ? 1 : clamp((o.nb | 0) || 1, 1, 3);
   G.mode = mode; G.ts = ts; G.nb = nb; G.score = [0, 0]; G.time = MATCH_LEN; G.ot = 0; G.overtime = false; G.infBoost = mode === 'free'; G.clock = 0; G.pts = 0; G.bd = {}; G.lastSec = -1; G.prayPaused = false; G.startedAt = Date.now();
-  setBalls(nb);
+  setBalls(nb); resetCoins(); $('#coinHud').textContent = 0; $('#coinHudW').hidden = false;
   for (const c of mates.concat(rivals)) showCar(c, false);
   cars = [player]; bots = [];
   const lv = mode === 'ranked' ? S.ranks[ts].rank : DIFFS[S.diff][1], names = shuffle(BOTN.slice());
@@ -1822,7 +1962,9 @@ function endMatch() {
       line = lost ? 'A loss takes one win off your rank-up bar.' : 'You never drop a rank. Go again.';
     }
   }
-  const r = grantXP(G.pts + 50, Math.round(G.pts / 6) + (won ? 40 : 10));
+  const base = won ? 200 : 80, perf = Math.round(G.pts / 4);
+  const r = grantXP(G.pts + 50, base + perf);
+  r.base = base; r.perf = perf; r.picked = G.coinGot || 0;
   showResult(won, promoted, line, r);
   if (r.ups.length) sfx.levelup(); else if (won) sfx.win();
 }
@@ -1830,7 +1972,8 @@ function grantXP(xp, coins) {
   const before = { level: S.level, xp: S.xp };
   S.xp += xp; S.coins += coins;
   const ups = []; let unlocked = [];
-  while (S.xp >= xpNeed(S.level)) { S.xp -= xpNeed(S.level); S.level++; S.coins += 100; ups.push(S.level); unlocked = unlocked.concat(grantRewards()); }
+  while (S.level < MAX_LV && S.xp >= xpNeed(S.level)) { S.xp -= xpNeed(S.level); S.level++; S.coins += 100; ups.push(S.level); unlocked = unlocked.concat(grantRewards()); }
+  if (S.level >= MAX_LV) S.xp = Math.min(S.xp, xpNeed(MAX_LV));
   persist();
   return { xp, coins, ups, unlocked, before };
 }
@@ -1848,6 +1991,26 @@ function goalScored(team, b) {
   screenFlash(mine ? '#5ea0ff' : '#ff8a33'); sfx.goal(mine); cheer(mine ? 1 : 0.4); buzz(mine ? [40, 60, 80] : 60);
   if (nBalls > 1 && !G.overtime) b.respawnT = 2.5;   // multi-ball: play goes on with the other balls and this one drops back in at the middle
   else { G.state = 'goal'; G.goalT = 3; }
+}
+/* coins to pick up in the arena during matches and Free Play: 10 each, back 25 seconds after you take one */
+const COIN_SPOTS = [[-22, 0.95, -18], [22, 0.95, 18], [-22, 0.95, 18], [22, 0.95, -18], [0, 0.95, -34], [0, 0.95, 34], [-36, 0.95, 0], [36, 0.95, 0],
+  [0, 5.5, -13], [0, 5.5, 13], [-W / 2 + 1, 6, -8], [W / 2 - 1, 6, 8]];
+const COIN_VALUE = 10, COIN_BACK = 25;
+const coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.12, 24); coinGeo.rotateX(Math.PI / 2);
+const coinMat = new THREE.MeshStandardMaterial({ color: 0xffc24a, metalness: 0.85, roughness: 0.25, emissive: 0x7a4a00, emissiveIntensity: 0.6 });
+const coins = COIN_SPOTS.map(([x, y, z]) => { const m = new THREE.Mesh(coinGeo, coinMat); m.position.set(x, y, z); m.visible = false; scene.add(m); return { x, y, z, t: 0, m }; });
+const coinsOn = () => G.mode === 'ranked' || G.mode === 'casual' || G.mode === 'free';
+function resetCoins() { for (const c of coins) c.t = 0; G.coinGot = 0; }
+function tickCoins(dt) {
+  if (!coinsOn()) return;
+  for (const c of coins) {
+    if (c.t > 0) { c.t -= dt; continue; }
+    if (player.active && (player.pos.x - c.x) ** 2 + (player.pos.y - c.y) ** 2 + (player.pos.z - c.z) ** 2 < 2.9) {
+      c.t = COIN_BACK; S.coins += COIN_VALUE; G.coinGot = (G.coinGot || 0) + COIN_VALUE; sfx.coin();
+      const d = document.createElement('div'); d.className = 'pop coin'; d.innerHTML = '<b>Coin</b><i>+' + COIN_VALUE + '</i>'; $('#feed').prepend(d); setTimeout(() => d.remove(), 1600);
+      $('#coinHud').textContent = G.coinGot; persist();
+    }
+  }
 }
 function physicsStep(dt) {
   G.clock += dt;
@@ -2117,6 +2280,7 @@ const sfx = {
   ui() { tone(700, 0.06, 'square', 0.05, 900); },
   buy() { [659, 784, 1047].forEach((f, i) => tone(f, 0.14, 'triangle', 0.14, f, i * 0.07)); },
   win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'triangle', 0.16, f, i * 0.12)); },
+  coin() { tone(1319, 0.12, 'square', 0.07); tone(1760, 0.18, 'square', 0.06, 1760, 0.07); },
   levelup() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.28, 'triangle', 0.16, f, i * 0.09)); },
   adhan() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 1.5, 'sine', 0.16, f, i * 0.32)); },   // a soft bell before the spoken call
   soon() { tone(784, 0.5, 'sine', 0.12); tone(988, 0.7, 'sine', 0.1, 988, 0.28); },
@@ -2148,7 +2312,7 @@ function badge(i, size) {
 }
 const pipsHtml = R => { let p = ''; for (let k = 0; k < 10; k++) p += `<i class="${k < Math.min(R.wins, 10) ? 'on' : ''}"></i>`; return p; };
 function profileHtml(lv, xp) {
-  return `<div class="lv"><span><small>LV</small>${lv}</span></div><div class="xp"><div class="row"><span>${xp} / ${xpNeed(lv)} XP</span><span class="coins">${S.coins}</span></div><div class="bar"><i style="width:${Math.min(100, xp / xpNeed(lv) * 100).toFixed(1)}%"></i></div></div>`;
+  return `<div class="lv"><span><small>LV</small>${lv}</span></div><div class="xp"><div class="row"><span>${lv >= MAX_LV ? 'Max level' : `${xp} / ${xpNeed(lv)} XP · level ${lv} of ${MAX_LV}`}</span><span class="coins">${S.coins}</span></div><div class="bar"><i style="width:${Math.min(100, xp / xpNeed(lv) * 100).toFixed(1)}%"></i></div></div>`;
 }
 const esc = v => String(v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const hexCol = v => '#' + v.toString(16).padStart(6, '0');
@@ -2225,12 +2389,13 @@ function updateHud(dt) {
   sp.textContent = Math.round(v * 3.6) + ' km/h'; sp.classList.toggle('ss', v > SUPERSONIC);
   if (G.state === 'countdown') { const n = Math.ceil(G.cd); if (n !== lastCd) { lastCd = n; if (G.mode !== 'challenge') flash(String(n), '#eef3ff', 1.1); sfx.beep(520, 0.12); } } else lastCd = -1;
 }
-const SCREENS = ['#menu', '#modes', '#garage', '#challenges', '#who', '#nameScr', '#settings', '#pause', '#result', '#preMatch', '#prayer', '#prayerSet'];
+const SCREENS = ['#menu', '#shop', '#modes', '#garage', '#challenges', '#who', '#nameScr', '#settings', '#pause', '#result', '#preMatch', '#prayer', '#prayerSet'];
 function showScreen(id) { for (const s of SCREENS) $(s).hidden = s !== id; }
 document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => {
   const g = b.dataset.go; audio(); sfx.ui();
   if (g === 'settings') showScreen('#settings');
   else if (g === 'garage') openGarage();
+  else if (g === 'shop') openShop();
   else if (g === 'challenges') { trainSession = false; openChallenges(); }
   else if (g === 'ranked' || g === 'casual') openModes(g);
   else launch('free', {});
@@ -2364,6 +2529,7 @@ function showResult(won, promoted, line, r) {
 
 function rewardLines(r) {
   let h = '';
+  if (r.base != null) h += `<div class="bd coinsbd"><span>${r.base === 200 ? 'Win' : 'Played'}</span><span>◆ ${r.base}</span><span>How you played</span><span>◆ ${r.perf}</span><span>Coins picked up</span><span>◆ ${r.picked}</span><span><b>Total</b></span><span><b>◆ ${r.base + r.perf + r.picked}</b></span></div>`;
   for (const l of r.ups) h += `<div class="unlock">Level ${l} reached! +100 coins</div>`;
   for (const it of r.unlocked) h += `<div class="unlock">Unlocked: ${it.name} (${TYPES.find(t => t[0] === it.type)[1]})</div>`;
   return h;
@@ -2419,6 +2585,31 @@ $('#actBtn').addEventListener('click', () => {
 });
 $('#garageBack').addEventListener('click', () => { sfx.ui(); player.dress(S.eq); renderMenu(); showScreen('#menu'); });
 
+/* shop: upgrades for the car you drive; each car keeps its own */
+function openShop() { player.dress(S.eq); showScreen('#shop'); renderShop(); }
+function renderShop() {
+  $('#sCoins').textContent = S.coins;
+  const body = S.eq.body, u = (S.up[body] = S.up[body] || {});
+  $('#sCars').innerHTML = ITEMS.filter(i => i.type === 'body' && S.owned[i.id]).map(i => `<button class="${i.id === body ? 'on' : ''}" data-b="${i.id}" type="button">${i.name}</button>`).join('');
+  $('#sCar').textContent = `Upgrades for ${ITEM[body].name}. Each car keeps its own upgrades.`;
+  $('#sList').innerHTML = UPG.map(g => {
+    const lv = clamp(u[g.k] | 0, 0, UPG_MAX), cost = UPG_COST[lv];
+    let pips = ''; for (let k = 0; k < UPG_MAX; k++) pips += `<i class="${k < lv ? 'on' : ''}"></i>`;
+    const btn = lv >= UPG_MAX ? '<button class="act" type="button" disabled>MAX</button>'
+      : `<button class="act" data-u="${g.k}" type="button"${S.coins < cost ? ' disabled' : ''}>◆ ${cost}</button>`;
+    return `<div class="upg cut"><div class="um"><b>${g.n}</b><small>${g.d} · +${Math.round(g.per * lv * 100)}%</small><span class="pips">${pips}</span></div>${btn}</div>`;
+  }).join('');
+}
+$('#sCars').addEventListener('click', e => { const b = e.target.closest('[data-b]'); if (!b) return; S.eq.body = b.dataset.b; persist(); player.dress(S.eq); sfx.ui(); renderShop(); });
+$('#sList').addEventListener('click', e => {
+  const b = e.target.closest('[data-u]'); if (!b || b.disabled) return;
+  const body = S.eq.body, u = (S.up[body] = S.up[body] || {}), lv = u[b.dataset.u] | 0, cost = UPG_COST[lv];
+  if (lv >= UPG_MAX || S.coins < cost) return;
+  S.coins -= cost; u[b.dataset.u] = lv + 1; persist(); player.dress(S.eq); sfx.buy(); renderShop();
+});
+$('#sGarage').addEventListener('click', () => { sfx.ui(); gar.tab = 'body'; openGarage(); });
+$('#shopBack').addEventListener('click', () => { sfx.ui(); renderMenu(); showScreen('#menu'); });
+
 /* ================= training ================= */
 let packTab = 'striker', trainSession = false;   // the Bismillah card shows once per training session, not before every short lesson
 const lvOpen = lv => lv.i === 0 || (S.chal[lv.pack.levels[lv.i - 1].key] || 0) > 0;
@@ -2447,6 +2638,7 @@ function startChallenge(key, retry) {
   audio(); wake();
   G.mode = 'challenge'; G.ci = key; G.infBoost = false; G.score = [0, 0]; G.overtime = false; G.pts = 0; G.bd = {}; G.lastSec = -1; G.clock = 0; G.trainOK = false;
   for (const q of mates.concat(rivals)) showCar(q, false);
+  $('#coinHudW').hidden = true;
   cars = [player]; bots = []; setBalls(1); G.ts = 1; G.nb = 1; G.prayPaused = false; G.grace = 0; G.landed = false; showCar(player, true); G.startedAt = Date.now(); player.role = 'attacker'; player.tball = null;
   player.dress(S.eq);
   player.place(c.car[0], c.car[1], c.car[2]); player.boost = 100;
@@ -3119,6 +3311,8 @@ function syncCar(c, dt, show) {
 }
 function render(dt) {
   syncCar(player, dt, G.state === 'menu' && !$('#garage').hidden && gar.tab === 'trail');
+  const con = coinsOn() && G.state !== 'menu';
+  for (const c of coins) { c.m.visible = con && c.t <= 0; if (c.m.visible) { c.m.rotation.y += dt * 2.6; c.m.position.y = c.y + Math.sin(tGlobal * 2 + c.x) * 0.12; } }
   for (const c of cars) if (c !== player) { syncCar(c, dt, false); if (c.tag && c.tag.visible) c.tag.position.set(c.pos.x, c.pos.y + 1.15, c.pos.z); }
   ballMat.emissive.setHex(ball.hover ? 0x40598a : 0x222a3a); ballMat.emissiveIntensity = ball.hover ? 1 + 0.5 * Math.sin(tGlobal * 5) : 1;
   for (const b of balls) {
@@ -3184,6 +3378,7 @@ function tick(dt, now, auto) {   // one frame of game logic (auto: the player's 
     for (const p of pads) if (p.t > 0) p.t -= dt;
     for (const c of cars) pickupPads(c);
     coachUpdate();
+    tickCoins(dt);
     recordBalls();
     for (const c of cars) if (c.demoT > 0 && G.state !== 'paused') { c.demoT -= dt; if (c.demoT <= 0) respawnCar(c); }
     if (G.state === 'play') for (const b of balls) if (b.on && !b.live && b.respawnT > 0) { b.respawnT -= dt; if (b.respawnT <= 0) placeBall(b.spawnX, 7, 0, b); }   // multi-ball: a scored ball drops back in

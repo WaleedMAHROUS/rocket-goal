@@ -1,6 +1,6 @@
 # Rocket Goal
 
-3D car soccer for phones and computers that puts prayer first: ranked 1v1, 2v2 and 3v3 from Bronze to Supersonic Legend (a separate rank for each), casual games up to 4v4, an optional 2 or 3 balls just for fun, 34 training levels with an aerial coach, separate saved players, and a garage of unlockable cars and parts.
+3D car soccer for phones and computers that puts prayer first: ranked 1v1, 2v2 and 3v3 from Bronze to Supersonic Legend (a separate rank for each), casual games up to 4v4, an optional 2 or 3 balls just for fun, 100 training levels with an aerial coach, 10 cars, a shop for per-car upgrades bought with in-game coins only (no real money), player levels up to 100, and separate saved players.
 
 The whole game is one self-contained `index.html` (three.js r128 and the fonts are embedded), plus a web app manifest, icons and a service worker so it installs to a phone's home screen and plays offline after the first visit.
 
