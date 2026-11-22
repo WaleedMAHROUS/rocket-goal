@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Rocket Goal</title>
-<meta name="description" content="Car soccer that puts prayer first: Rumble power-ups, Heatseeker, challenges, animated boosts and goal explosions, play online with your brother, ranked 1v1, 2v2 and 3v3, casual up to 4v4, 100 training levels, 10 cars, a shop for upgrades, prayer times for your city.">
+<meta name="description" content="Car soccer that puts prayer first: PlayStation controller support, Rumble power-ups, Heatseeker, challenges, animated boosts and goal explosions, play online with your brother, ranked 1v1, 2v2 and 3v3, casual up to 4v4, 100 training levels, 10 cars, a shop for upgrades, prayer times for your city.">
 <meta name="theme-color" content="#060914">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -352,6 +352,18 @@ body.free #coach{top:calc(104px + var(--st))}
 .chrow.ok .bar i{background:linear-gradient(90deg,#ffc24a,#ff8a1f)}
 .chrow.key{border-color:rgba(122,252,255,.5)}
 .chrow .act{min-width:84px}
+
+.padrow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:var(--panel);border:1px solid var(--line);padding:11px 14px;color:var(--ink);font-size:15px;font-weight:600;text-align:left}
+.padrow b{font-family:var(--display);font-size:16px;color:var(--boost);white-space:nowrap}
+.padrow.wait{border-color:var(--boost);box-shadow:0 0 14px rgba(255,194,74,.45)}
+.padrow.wait b{animation:padblink 0.8s ease-in-out infinite}
+.padrow.fixed{opacity:.65}
+@keyframes padblink{50%{opacity:.35}}
+.chip.on b{color:#5fe08a}
+.chip small{display:block;color:var(--muted);font-weight:500;font-size:13px;margin-top:2px}
+.padfocus{outline:3px solid var(--boost)!important;outline-offset:2px;box-shadow:0 0 18px rgba(255,194,74,.5)}
+.padtoast{position:fixed;left:50%;top:calc(12px + var(--st));transform:translate(-50%,-20px);opacity:0;transition:.3s;z-index:50;background:rgba(6,9,20,.92);border:1px solid var(--boost);color:var(--ink);padding:10px 16px;font-weight:700;max-width:calc(100vw - 32px);text-align:center;pointer-events:none}
+.padtoast.show{opacity:1;transform:translate(-50%,0)}
 </style>
 </head>
 <body>
@@ -430,6 +442,20 @@ body.free #coach{top:calc(104px + var(--st))}
     <button class="mbtn cut" id="mBack" type="button"><b>Back</b></button>
   </div>
 </section>
+
+<section class="screen side" id="padScr" hidden>
+  <div class="col">
+    <h2 class="gtitle">Controller</h2>
+    <p class="olstat" id="padStat"></p>
+    <p class="eyebrow">Tap a job, then press the button you want for it</p>
+    <div class="col0" id="padList"></div>
+    <p class="rsub" id="padLive"></p>
+    <div class="setrow" id="padOpts"></div>
+    <button class="mbtn cut" id="padReset" type="button"><b>Back to the standard buttons</b><small>R2 drive, ✕ jump, ○ boost</small></button>
+    <button class="mbtn cut" id="padBack" type="button"><b>Back</b></button>
+  </div>
+</section>
+<div class="padtoast" id="padToast" hidden></div>
 
 <section class="screen side" id="season" hidden>
   <div class="col">
@@ -534,6 +560,7 @@ body.free #coach{top:calc(104px + var(--st))}
       <button class="chip" id="sndBtn" type="button">Sound <b>ON</b></button>
       <button class="chip" id="prayBtn" type="button">Prayer times <b>OPEN</b></button>
       <button class="chip" id="fsBtn" type="button">Fullscreen <b>GO</b></button>
+      <button class="chip" id="padBtn" type="button">PlayStation controller <b>🎮 SET UP</b></button>
     </div>
     <h3>Phone</h3>
     <ul class="tips">
@@ -543,6 +570,17 @@ body.free #coach{top:calc(104px + var(--st))}
       <li><b>In the air</b> the stick turns the car only after you move it, so holding forward to drive will not spin you.</li>
       <li><b>Roll:</b> hold on the ground to drift. Hold in the air and push the stick sideways to spin.</li>
     </ul>
+    <h3>PlayStation controller</h3>
+    <div class="keys">
+      <span><kbd>R2</kbd> / <kbd>L2</kbd></span><span>Drive / reverse</span>
+      <span><kbd>Left stick</kbd></span><span>Steer. In the air: tilt and turn</span>
+      <span><kbd>✕</kbd> <kbd>○</kbd></span><span>Jump (again to flip) / Boost</span>
+      <span><kbd>□</kbd></span><span>Drift, and air roll with the stick</span>
+      <span><kbd>L1</kbd> <kbd>R1</kbd></span><span>Air roll left / right</span>
+      <span><kbd>△</kbd> <kbd>Options</kbd></span><span>Ball cam / pause</span>
+      <span><kbd>D-pad ↑</kbd></span><span>Use power-up in Rumble</span>
+      <span><kbd>Right stick</kbd></span><span>Look around. In menus: D-pad to move, ✕ to choose, ○ to go back</span>
+    </div>
     <h3>Keyboard and mouse</h3>
     <div class="keys">
       <span><kbd>W A S D</kbd> or arrows</span><span>Drive and steer. In the air: tilt and turn</span>
@@ -895,6 +933,7 @@ function cleanSave(src) {   // fill gaps and drop unknown items, so an old, part
     if (typeof src.tcol === 'string' && TCOL[src.tcol]) d.tcol = src.tcol;
     if (src.st && typeof src.st === 'object') for (const k of STATK) if (Number.isFinite(src.st[k])) d.st[k] = Math.max(0, src.st[k] | 0);
     for (const f of ['chd', 'chn']) if (src[f] && typeof src[f] === 'object') for (const k in src[f]) if (CHALS.some(c => c.id === k)) d[f][k] = 1;
+    d.pad = cleanPad(src.pad);
     if (typeof src.cvar === 'string' && ['soccar', 'rumble', 'heat'].includes(src.cvar)) d.cvar = src.cvar;
     if (src.owned && typeof src.owned === 'object') for (const k in src.owned) { if (ITEM[k]) d.owned[k] = 1; else if (REFUND[k]) d.coins += REFUND[k]; }
     if (src.chal && typeof src.chal === 'object') for (const k in src.chal) if (LEVEL[k]) d.chal[k] = clamp(src.chal[k] | 0, 0, 3);
@@ -2990,7 +3029,10 @@ function tUp(e) {
 }
 tEl.addEventListener('pointerup', tUp); tEl.addEventListener('pointercancel', tUp);
 function touchReset() { T.sid = null; T.x = T.y = 0; T.ptrs.clear(); refreshBtns(); stickHome(); }
-function buzz(p) { try { if (T.on && navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+function buzz(p) {
+  try { if (T.on && navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+  if (PAD.active) { const ms = Array.isArray(p) ? p.reduce((a, b) => a + b, 0) : p; padRumble(Math.min(600, ms * 2), ms > 60); }
+}
 let wl = null;
 function wake() { try { if (navigator.wakeLock && !wl) navigator.wakeLock.request('screen').then(l => { wl = l; l.addEventListener('release', () => { wl = null; }); }).catch(() => {}); } catch (e) {} }
 
@@ -3003,18 +3045,9 @@ function pollInput() {
   let roll = (k('KeyE') ? 1 : 0) - (k('KeyQ') ? 1 : 0);
   let jump = k('Space') || mouseR, boost = k('ShiftLeft') || k('ShiftRight') || mouseL, hb = k('ControlLeft') || k('ControlRight') || k('KeyX'), item = k('KeyF');
   let throttle = fwd, pitch = fwd;
-  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
-  for (const gp of gps) {
-    if (!gp) continue;
-    const dz = v => Math.abs(v) < 0.15 ? 0 : v, bt = i => gp.buttons[i] ? gp.buttons[i].value : 0, pr = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
-    st += dz(gp.axes[0] || 0); pitch += -dz(gp.axes[1] || 0); throttle += bt(7) - bt(6);
-    jump = jump || pr(0); boost = boost || pr(1); hb = hb || pr(2); item = item || pr(10) || pr(11);
-    roll += (pr(5) ? 1 : 0) - (pr(4) ? 1 : 0);
-    const prev = gpPrev[gp.index] || [];
-    if (pr(3) && !prev[3]) toggleCam();
-    if (pr(9) && !prev[9]) togglePause();
-    gpPrev[gp.index] = gp.buttons.map(b => b.pressed);
-  }
+  const o = { st, pitch, throttle, jump, boost, hb, item, roll };
+  padPoll(o);
+  ({ st, pitch, throttle, jump, boost, hb, item, roll } = o);
   if (T.on) {
     let tt = Math.abs(T.y) > 0.25 ? Math.sign(T.y) : T.y * 4;
     if (T.y > -0.25 && Math.abs(T.x) > 0.45) tt = Math.max(tt, 0.7);   // pushing sideways also drives forward, like a kart
@@ -3033,6 +3066,159 @@ function pollInput() {
   I.ap = AIR.lock ? 0 : I.pitch; I.ay = AIR.lock ? 0 : I.yaw; I.ar = I.roll;
   if (!inGame() || G.state === 'countdown') clearIn(I);
 }
+
+/* ================= PlayStation controller (or any Bluetooth gamepad) =================
+   Standard layout, the same idea as Rocket League: R2 drives, L2 reverses, ✕ jumps, ○ boosts.
+   Every player can change any button in Settings > Controller. With a controller the menus work too:
+   D-pad or left stick to move, ✕ to choose, ○ to go back. */
+const PSN = ['✕ Cross', '○ Circle', '□ Square', '△ Triangle', 'L1', 'R1', 'L2', 'R2', 'Create', 'Options', 'L3', 'R3', 'D-pad ↑', 'D-pad ↓', 'D-pad ←', 'D-pad →', 'PS', 'Touchpad'];
+const PAD_ACT = [
+  ['gas', 'Accelerate', 7], ['rev', 'Reverse and brake', 6], ['jump', 'Jump (again to flip)', 0], ['boost', 'Boost', 1],
+  ['slide', 'Drift, and air roll with the stick', 2], ['cam', 'Ball cam on and off', 3], ['rollL', 'Air roll left', 4], ['rollR', 'Air roll right', 5],
+  ['item', 'Use power-up (Rumble)', 12], ['pause', 'Pause', 9]
+];
+const PAD_DEF = Object.fromEntries(PAD_ACT.map(a => [a[0], a[2]]));
+const PAD = { active: false, name: '', rx: 0, ry: 0, capture: null, last: -1, navT: 0, navDir: '', prev: [] };
+const padCfg = () => S.pad || (S.pad = { map: Object.assign({}, PAD_DEF), stick: false, inv: false, rumble: true });
+const padMap = () => padCfg().map;
+const btnName = i => PSN[i] || 'Button ' + (i + 1);
+function cleanPad(src) {
+  const d = { map: Object.assign({}, PAD_DEF), stick: false, inv: false, rumble: true };
+  if (src && typeof src === 'object') {
+    if (src.map && typeof src.map === 'object') for (const k in PAD_DEF) if (Number.isInteger(src.map[k]) && src.map[k] >= 0 && src.map[k] < 32) d.map[k] = src.map[k];
+    for (const k of ['stick', 'inv', 'rumble']) if (typeof src[k] === 'boolean') d[k] = src[k];
+  }
+  return d;
+}
+function padRumble(ms, strong) {
+  if (!PAD.active || !padCfg().rumble) return;
+  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const gp of gps) if (gp && gp.vibrationActuator && gp.vibrationActuator.playEffect)
+    try { gp.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong ? 1 : 0.5, weakMagnitude: strong ? 0.8 : 0.6 }).catch(() => {}); } catch (e) {}
+}
+function padToast(txt) {
+  const el = $('#padToast'); el.textContent = txt; el.hidden = false; el.classList.add('show');
+  clearTimeout(padToast.t); padToast.t = setTimeout(() => { el.classList.remove('show'); setTimeout(() => { el.hidden = true; }, 300); }, 3200);
+}
+addEventListener('gamepadconnected', e => { PAD.active = true; PAD.name = e.gamepad.id; padToast('🎮 Controller connected. Change the buttons in How to play > Controller'); if (!$('#padScr').hidden) renderPad(); });
+addEventListener('gamepaddisconnected', () => { const any = (navigator.getGamepads ? [...navigator.getGamepads()] : []).some(g => g); if (!any) { PAD.active = false; padToast('🎮 Controller disconnected'); } if (!$('#padScr').hidden) renderPad(); });
+addEventListener('pointerdown', e => { if (e.pointerType === 'touch') PAD.active = false; }, true);   // touching the screen brings the touch buttons back
+
+/* menus with the controller */
+function topScreen() {
+  const vis = SCREENS.filter(id => !$(id).hidden);
+  return vis.includes('#prayer') ? $('#prayer') : vis.length ? $(vis[0]) : null;
+}
+function navItems(scr) {
+  return [...scr.querySelectorAll('button, [data-it], a[href], input')].filter(el => {
+    if (el.disabled || el.closest('[hidden]')) return false;
+    const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4;
+  });
+}
+function padFocus(el) {
+  const old = document.querySelector('.padfocus'); if (old) old.classList.remove('padfocus');
+  if (!el) return;
+  el.classList.add('padfocus'); try { el.focus({ preventScroll: true }); } catch (e) {}
+  try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
+}
+function padNav(dir) {
+  const scr = topScreen(); if (!scr) return;
+  const items = navItems(scr); if (!items.length) return;
+  let cur = document.querySelector('.padfocus');
+  if (!cur || !items.includes(cur)) { padFocus(items.find(el => el.classList.contains('primary')) || items[0]); return; }   // start on the main button
+  const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  const dx = dir === 'l' ? -1 : dir === 'r' ? 1 : 0, dy = dir === 'u' ? -1 : dir === 'd' ? 1 : 0;
+  let best = null, bs = 1e9;
+  for (const el of items) {
+    if (el === cur) continue;
+    const r = el.getBoundingClientRect(), x = r.left + r.width / 2 - ax, y = r.top + r.height / 2 - ay;
+    const along = x * dx + y * dy; if (along <= 4) continue;
+    const side = Math.abs(x * dy) + Math.abs(y * dx), sc = along + side * 2.5;
+    if (sc < bs) { bs = sc; best = el; }
+  }
+  if (best) { padFocus(best); sfx.ui(); }
+}
+function padBack() {
+  const scr = topScreen(); if (!scr) return;
+  if (scr.id === 'pause') { togglePause(); return; }
+  const b = scr.querySelector('[id$="Back"]:not([hidden]), [id$="back"]:not([hidden]), #nameCancel, #olBack, #menuBtn');
+  if (b && !b.disabled) b.click();
+}
+/* reads the controllers once per frame: menus, button capture, and the drive controls it returns */
+function padPoll(out) {
+  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  const M = padMap(), cfg = padCfg();
+  let rx = 0, ry = 0, any = false;
+  const scr = inGame() && !G.prayPaused ? (!$('#pause').hidden ? $('#pause') : null) : topScreen();
+  for (const gp of gps) {
+    if (!gp) continue;
+    const prev = PAD.prev[gp.index] || [], now = gp.buttons.map(b => b.pressed);
+    const edge = i => now[i] && !prev[i];
+    const dz = v => Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v) * 0.18) / 0.82;
+    const ax = i => dz(gp.axes[i] || 0), val = i => gp.buttons[i] ? gp.buttons[i].value : 0, pr = i => !!now[i];
+    if (now.some(Boolean) || gp.axes.some(v => Math.abs(v) > 0.4)) { any = true; if (!PAD.active) { PAD.active = true; PAD.name = gp.id; } }
+    for (let i = 0; i < now.length; i++) if (edge(i)) PAD.last = i;
+    if (PAD.capture) {   // Settings > Controller is waiting for a button
+      for (let i = 0; i < now.length; i++) if (edge(i) && i !== 16) { padAssign(PAD.capture, i); break; }
+    } else if (scr) {   // a menu is on screen: steer the focus
+      let dir = edge(12) ? 'u' : edge(13) ? 'd' : edge(14) ? 'l' : edge(15) ? 'r' : '';
+      const sx = gp.axes[0] || 0, sy = gp.axes[1] || 0;
+      const held = Math.abs(sy) > 0.6 ? (sy < 0 ? 'u' : 'd') : Math.abs(sx) > 0.6 ? (sx < 0 ? 'l' : 'r') : (pr(12) ? 'u' : pr(13) ? 'd' : pr(14) ? 'l' : pr(15) ? 'r' : '');
+      if (!dir && held) { if (held !== PAD.navDir) { dir = held; PAD.navT = 0.38; } else { PAD.navT -= 1 / 60; if (PAD.navT <= 0) { dir = held; PAD.navT = 0.13; } } }
+      PAD.navDir = held;
+      if (dir) padNav(dir);
+      if (edge(0)) { const f = document.querySelector('.padfocus'); if (f && scr.contains(f)) { audio(); f.click(); } else padNav('d'); }
+      if (edge(1)) padBack();
+      if (edge(9) && scr.id === 'pause') togglePause();
+    } else {   // driving
+      out.st += ax(0);
+      const py = -ax(1) * (cfg.inv ? -1 : 1);
+      out.pitch += py;
+      if (cfg.stick) out.throttle += -ax(1);
+      out.throttle += val(M.gas) - val(M.rev);
+      out.jump = out.jump || pr(M.jump); out.boost = out.boost || pr(M.boost); out.hb = out.hb || pr(M.slide); out.item = out.item || pr(M.item);
+      out.roll += (pr(M.rollR) ? 1 : 0) - (pr(M.rollL) ? 1 : 0);
+      if (edge(M.cam)) toggleCam();
+      if (edge(M.pause)) togglePause();
+      if (Math.abs(ax(2)) > Math.abs(rx)) rx = ax(2);
+      if (Math.abs(ax(3)) > Math.abs(ry)) ry = ax(3);
+    }
+    PAD.prev[gp.index] = now;
+  }
+  PAD.rx = rx; PAD.ry = ry;
+  if (any && !$('#padScr').hidden) padLive();
+}
+
+/* Settings > Controller */
+function padAssign(act, i) {
+  const M = padMap(), old = M[act];
+  for (const k in M) if (k !== act && M[k] === i) M[k] = old;   // that button already had a job: swap them
+  M[act] = i; PAD.capture = null; persist(); sfx.buy(); renderPad();
+}
+function openPad() { PAD.capture = null; showScreen('#padScr'); renderPad(); }
+function renderPad() {
+  const M = padMap(), cfg = padCfg();
+  $('#padStat').innerHTML = PAD.active ? `🎮 <b>Connected</b>${PAD.name ? ' · ' + esc(PAD.name.replace(/\(.*?\)/g, '').slice(0, 40)) : ''}` :
+    '🎮 <b>No controller yet.</b> Pair it in the phone\'s Bluetooth settings (PS4: hold Share + PS until the light flashes. PS5: hold Create + PS), then press any button on it here.';
+  $('#padList').innerHTML = PAD_ACT.map(([k, n]) => {
+    const wait = PAD.capture === k;
+    return `<button class="padrow cut ${wait ? 'wait' : ''}" data-act="${k}" type="button"><span>${n}</span><b>${wait ? 'Press a button…' : esc(btnName(M[k]))}</b></button>`;
+  }).join('') + `<div class="padrow fixed cut"><span>Steer, and tilt in the air</span><b>Left stick</b></div><div class="padrow fixed cut"><span>Look around</span><b>Right stick</b></div>`;
+  $('#padOpts').innerHTML = [['stick', 'Left stick forward also drives', 'Like FIFA: push up to go'], ['inv', 'Invert up and down in the air', 'Push up to tilt the nose up'], ['rumble', 'Vibration', 'If the controller supports it here']]
+    .map(([k, n, d]) => `<button class="chip ${cfg[k] ? 'on' : ''}" data-opt="${k}" type="button">${n} <b>${cfg[k] ? 'ON' : 'OFF'}</b><small>${d}</small></button>`).join('');
+  $('#padLive').textContent = PAD.last >= 0 ? 'Last button pressed: ' + btnName(PAD.last) : 'Press any button to test it';
+}
+function padLive() { if (PAD.last >= 0) $('#padLive').textContent = 'Last button pressed: ' + btnName(PAD.last); }
+$('#padList').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  sfx.ui(); PAD.capture = PAD.capture === b.dataset.act ? null : b.dataset.act;
+  for (const gp of (navigator.getGamepads ? navigator.getGamepads() : [])) if (gp) PAD.prev[gp.index] = gp.buttons.map(x => x.pressed);   // the ✕ that chose this row is not the answer
+  renderPad();
+});
+$('#padOpts').addEventListener('click', e => { const b = e.target.closest('[data-opt]'); if (!b) return; const c = padCfg(); c[b.dataset.opt] = !c[b.dataset.opt]; persist(); sfx.ui(); renderPad(); if (b.dataset.opt === 'rumble' && c.rumble) padRumble(300, true); });
+$('#padReset').addEventListener('click', () => { padCfg().map = Object.assign({}, PAD_DEF); PAD.capture = null; persist(); sfx.ui(); renderPad(); });
+$('#padBack').addEventListener('click', () => { PAD.capture = null; sfx.ui(); showScreen('#settings'); });
+$('#padBtn').addEventListener('click', () => { sfx.ui(); openPad(); });
 
 /* ================= camera ================= */
 const cam = { pos: new V3(0, 8, -30), heading: new V3(0, 0, 1), up: new V3(0, 1, 0), ball: S.cam !== false, orbit: 0.6, dist: 3.0, height: 1.2, look: 0.85 };
@@ -3064,14 +3250,16 @@ function updateCamera(dt) {
   cam.heading.lerp(cDir, 1 - Math.exp(-(useBall ? 10 : 7) * dt)).normalize();
   cam.up.copy(UP);
   const dist = portrait ? 3.9 : cam.dist, hgt = portrait ? 1.9 : cam.height, look = portrait ? -0.25 : (T.on ? 0.55 : cam.look);
-  cDes.copy(c.pos).addScaledVector(cam.heading, -dist).addScaledVector(UP, hgt);
+  const hd = tC.copy(cam.heading), lookOn = Math.abs(PAD.rx) > 0.15 || Math.abs(PAD.ry) > 0.15;
+  if (lookOn) hd.applyAxisAngle(UP, -PAD.rx * 2.2);   // right stick: look around
+  cDes.copy(c.pos).addScaledVector(hd, -dist).addScaledVector(UP, hgt + (lookOn ? -PAD.ry * 1.2 : 0));
   cam.pos.lerp(cDes, 1 - Math.exp(-16 * dt));
   const wd = wallDist(cam.pos.x, cam.pos.y, cam.pos.z);
   if (wd < 0.35) cam.pos.addScaledVector(wallNormal(cam.pos.x, cam.pos.y, cam.pos.z, tN), 0.35 - wd);
-  if (useBall) {
+  if (useBall && !lookOn) {
     const d = tA.copy(cb.pos).sub(cam.pos).normalize(); d.y = clamp(d.y, -0.25, 0.55);
     cLook.copy(c.pos).addScaledVector(cam.up, look).addScaledVector(d, 3);
-  } else cLook.copy(c.pos).addScaledVector(cam.up, look).addScaledVector(cam.heading, 3);
+  } else cLook.copy(c.pos).addScaledVector(cam.up, look).addScaledVector(hd, 3);
   camera.position.copy(cam.pos);
   if (camShake > 0) { camShake -= dt; const s = camShake * 0.25; camera.position.x += (Math.random() - .5) * s; camera.position.y += (Math.random() - .5) * s; }
   camera.up.copy(cam.up); camera.lookAt(cLook);
@@ -3236,7 +3424,7 @@ function updateHud(dt) {
   sp.textContent = Math.round(v * 3.6) + ' km/h'; sp.classList.toggle('ss', v > SUPERSONIC);
   if (G.state === 'countdown') { const n = Math.ceil(G.cd); if (n !== lastCd) { lastCd = n; if (G.mode !== 'challenge') flash(String(n), '#eef3ff', 1.1); sfx.beep(520, 0.12); } } else lastCd = -1;
 }
-const SCREENS = ['#menu', '#season', '#online', '#shop', '#modes', '#garage', '#challenges', '#who', '#nameScr', '#settings', '#pause', '#result', '#preMatch', '#prayer', '#prayerSet'];
+const SCREENS = ['#menu', '#padScr', '#season', '#online', '#shop', '#modes', '#garage', '#challenges', '#who', '#nameScr', '#settings', '#pause', '#result', '#preMatch', '#prayer', '#prayerSet'];
 function showScreen(id) { for (const s of SCREENS) $(s).hidden = s !== id; }
 document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => {
   const g = b.dataset.go; audio(); sfx.ui();
@@ -4233,7 +4421,7 @@ function tick(dt, now, auto) {   // one frame of game logic (auto: the player's 
   if (!auto) pollInput();
   if (G.mode === 'online' && NET.role === 'guest') {   // a guest's phone shows the host's match and sends its controls
     netGuestTick(dt); prayerTick(now);
-    $('#touch').hidden = !(T.on && inGame());
+    $('#touch').hidden = !(T.on && !PAD.active && inGame());
     updateHud(dt); updateAudio(dt); return;
   }
   if (G.state !== 'paused' && bots.length) {
@@ -4265,7 +4453,7 @@ function tick(dt, now, auto) {   // one frame of game logic (auto: the player's 
   } else acc = 0;
   netHostTick(dt);
   prayerTick(now);
-  $('#touch').hidden = !(T.on && inGame());
+  $('#touch').hidden = !(T.on && !PAD.active && inGame());
   updateHud(dt); updateAudio(dt);
 }
 /* ================= online: phones play together over WebRTC (PeerJS) =================
