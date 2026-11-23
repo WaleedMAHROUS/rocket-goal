@@ -561,6 +561,7 @@ body.free #coach{top:calc(104px + var(--st))}
       <button class="chip" id="prayBtn" type="button">Prayer times <b>OPEN</b></button>
       <button class="chip" id="fsBtn" type="button">Fullscreen <b>GO</b></button>
       <button class="chip" id="padBtn" type="button">PlayStation controller <b>🎮 SET UP</b></button>
+      <button class="chip" id="easyBtn" type="button">Easy flying <b id="easyV">ON</b><small>Jump, then boost: the car points up at the ball by itself</small></button>
     </div>
     <h3>Phone</h3>
     <ul class="tips">
@@ -592,7 +593,7 @@ body.free #coach{top:calc(104px + var(--st))}
     </div>
     <h3>Tricks to learn</h3>
     <ul class="tips">
-      <li><b>Aerial:</b> jump, tilt back, then boost toward the ball.</li>
+      <li><b>Aerial:</b> jump, then boost. With Easy flying on, the car points up at the ball by itself. Move the stick to take over.</li>
       <li><b>Flick:</b> carry the ball on your roof, then jump and flip.</li>
       <li><b>Pinch:</b> smash the ball into the curved ramp or a wall and it fires out like a cannon.</li>
       <li><b>Flip reset:</b> touch the ball with all four wheels in the air to get your flip back.</li>
@@ -826,7 +827,8 @@ const ITEM = {}; ITEMS.forEach(i => ITEM[i.id] = i);
 const REFUND = { p_cobalt: 150, p_crimson: 150, p_lime: 200, p_stealth: 250, p_violet: 300, p_mint: 300, p_gold: 700, p_chrome: 900, p_aurora: 900, p_carbon: 1200,
   p_pearl: 1300, p_desert: 1500, p_royal: 1800, p_emerald: 2200, p_platinum: 2800, t_toxic: 200, t_plasma: 350, t_gold: 500, t_comet: 900, t_inferno: 1400, t_nebula: 2000 };
 const TYPES = [['body', 'Cars'], ['paint', 'Paint'], ['trail', 'Boost'], ['wheel', 'Wheels'], ['topper', 'Topper'], ['goalfx', 'Goal FX']];
-const DIFFS = [['Rookie', 0], ['Semi-Pro', 2], ['Pro', 4], ['All-Star', 6]];
+const DIFFS = [['Auto', -1], ['Rookie', 0], ['Semi-Pro', 2], ['Pro', 4], ['All-Star', 6]];   // Auto: the bots match how you play, and keep matching it during the match
+const AUTO_D = 0;
 const MAX_LV = 100;
 const xpNeed = l => 250 + 35 * (l - 1);   // gentle enough that level 100 is a long goal, not an impossible one
 /* the Shop: upgrades for the car you drive, bought with coins earned in the game (there is no real money anywhere) */
@@ -910,7 +912,7 @@ const PRAYED_RE = /^\d{4}-\d\d-\d\d:(fajr|dhuhr|asr|maghrib|isha)$/;
 function blankSave() {
   return { rank: 0, wins: 0, W: 0, L: 0, ranks: { 1: blankRank(), 2: blankRank(), 3: blankRank() },
     rts: 1, rnb: 1, cts: 1, cnb: 1, prayed: {}, tip: 0, up: {}, tcol: 'blue', cvar: 'soccar', st: {}, chd: {}, chn: {},
-    level: 1, xp: 0, coins: 150, owned: {}, chal: {}, sound: true, diff: 0, cam: true,
+    level: 1, xp: 0, coins: 150, owned: {}, chal: {}, sound: true, diff: 0, diffV: 2, skill: 3, cam: true,
     eq: { body: 'b_hatch', paint: 'p_blue', trail: 't_std', wheel: 'w_stock', topper: 'h_none', goalfx: 'g_classic' } };
 }
 /* team colours: you pick your team's colour; the other team gets one that stands apart from it */
@@ -928,6 +930,10 @@ function cleanSave(src) {   // fill gaps and drop unknown items, so an old, part
   const d = blankSave();
   if (src && typeof src === 'object') {
     for (const k of ['level', 'xp', 'coins', 'diff', 'rts', 'rnb', 'cts', 'cnb', 'tip']) if (Number.isFinite(src[k])) d[k] = src[k];
+    if (src.diffV !== 2) d.diff = AUTO_D;   // the bot levels moved: everyone starts on Auto
+    d.diff = clamp(d.diff | 0, 0, DIFFS.length - 1);
+    if (Number.isFinite(src.skill)) d.skill = clamp(src.skill, 0, 7);
+    if (typeof src.easyAir === 'boolean') d.easyAir = src.easyAir;
     if (src.eq && src.eq.paint && !ITEM[src.eq.paint]) d.eq.paint = 'p_blue';
     for (const k of ['sound', 'cam']) if (typeof src[k] === 'boolean') d[k] = src[k];
     if (typeof src.tcol === 'string' && TCOL[src.tcol]) d.tcol = src.tcol;
@@ -1706,16 +1712,25 @@ function burstShapes(p, n, o, spd, up) {
   for (let i = 0; i < n; i++) { sphereDir(tN); const s = rnd(spd * 0.35, spd); fx(p.x, p.y, p.z, tN.x * s, Math.abs(tN.y) * s * (up || 0.8) + s * 0.25, tN.z * s, typeof o === 'function' ? o(i) : o); }
 }
 const GFX = {
-  splash(p, d, dz) {
-    const dark = d.dark, cols = dark ? [0x111318, 0x2a2e38, 0x050608] : [0x2fb6ff, 0x8fe2ff, 0xffffff, 0x1f7fff];
-    for (let i = 0; i < 260; i++) {
-      sphereDir(tN); const s = rnd(6, 26);
-      fx(p.x, p.y, p.z, tN.x * s, Math.abs(tN.y) * s + 6, tN.z * s + dz * 6, { tile: i % 3 ? FXT.drop : FXT.bubble, col: pick(cols), life: rnd(1, 2), size: rnd(0.35, 0.9), size1: 0.2, grav: 14, drag: 0.8, rot: Math.atan2(tN.x, tN.y) });
+  splash(p, d, dz) {   // a wave bursts out of the net: a dome of water, tall jets, mist, a ripple on the grass, and SPLASH!
+    const dark = d.dark, cols = dark ? [0x111318, 0x2a2e38, 0x050608, 0x3a3f4a] : [0x0a6cff, 0x1f9bff, 0x52c3ff, 0xa8e6ff, 0xffffff];
+    const gy = 0.6, mouth = p.z - goalDir(p) * 0 , cx = clamp(p.x, -GW / 2 + 1, GW / 2 - 1);
+    for (let i = 0; i < 520; i++) {   // the main burst, thrown out toward the field
+      sphereDir(tN); const s = rnd(7, 30);
+      fx(cx + rnd(-1.5, 1.5), Math.max(gy, p.y), mouth, tN.x * s * 0.9, Math.abs(tN.y) * s + 7, dz * Math.abs(tN.z) * s + dz * 5,
+        { tile: i % 5 ? FXT.drop : FXT.bubble, col: pick(cols), life: rnd(1.3, 2.4), size: rnd(0.8, 2.1), size1: 0.35, grav: 15, drag: 0.6 });
     }
-    for (let i = 0; i < 26; i++) fx(p.x + rnd(-3, 3), p.y + rnd(-1, 2), p.z, rnd(-3, 3), rnd(1, 4), dz * rnd(2, 6), { tile: FXT.puff, col: dark ? 0x22252c : 0xdff6ff, life: 1.6, size: 3, size1: 7, drag: 2 });
-    tA.set(p.x, p.y + 3.2, p.z + dz * 3);
-    popWord('SPLASH!', dark ? '#ffffff' : '#ff2a2a', dark ? '#111111' : '#ffffff', tA, 13);
-    sfx.splash();
+    fxEvery(1.3, () => {   // water jets shooting up across the goal mouth
+      for (let k = -2; k <= 2; k++) for (let n = 0; n < 3; n++)
+        fx(k * GW / 5 + rnd(-0.4, 0.4), gy, p.z - dz * -0.5, rnd(-1.2, 1.2), rnd(16, 25), dz * rnd(1, 5), { tile: FXT.drop, col: pick(cols), life: rnd(1.2, 1.8), size: rnd(0.9, 1.7), size1: 0.4, grav: 16, drag: 0.4 });
+    });
+    for (let i = 0; i < 46; i++) fx(cx + rnd(-GW / 2, GW / 2), rnd(0.5, 4), p.z + dz * rnd(0, 4), rnd(-2, 2), rnd(1, 4), dz * rnd(2, 7),
+      { tile: FXT.puff, col: dark ? 0x30343c : pick([0xd6f1ff, 0xeaf8ff, 0xb8e4ff]), life: rnd(1.8, 2.6), size: rnd(3, 5), size1: rnd(9, 14), drag: 1.6 });   // mist
+    for (let r = 0; r < 3; r++) later(r * 0.18, () => fx(cx, 0.1, p.z + dz * 3, 0, 0, 0, { tile: FXT.ring, col: dark ? 0x2a2e38 : 0x52c3ff, life: 1, size: 2, size1: 20 + r * 6, drag: 0 }));
+    tA.set(cx, p.y + 4.5, p.z + dz * 4);
+    popWord('SPLASH!', dark ? '#ffffff' : '#ff2a2a', dark ? '#111111' : '#ffffff', tA, 16);
+    screenFlash(dark ? 'rgba(20,22,28,.55)' : 'rgba(40,150,255,.5)');
+    sfx.splash(); later(0.25, () => sfx.splash());
   },
   dragons(p, d, dz) {
     const o = new V3(p.x, Math.max(1.5, p.y), p.z);
@@ -1977,6 +1992,18 @@ function airControl(c, I, dt, boosting, jumpPress) {
   let pitchIn = I.ap != null ? I.ap : I.pitch, yawIn = I.ay != null ? I.ay : I.yaw, rollIn = I.ar != null ? I.ar : I.roll;
   if (I.hb) { if (!rollIn) rollIn = I.ay != null ? I.ay : I.steer; yawIn = 0; }   // free air roll
   const flipping = c.dodgeT > 0;
+  if (c.easyAir && !flipping && (boosting || I.jump) && Math.abs(pitchIn) < 0.25 && Math.abs(yawIn) < 0.25 && !rollIn && !I.hb && c.airT < 3) {
+    // Easy flying: press jump, then boost (or keep holding jump) and the car points itself up, toward the ball if it is in the air ahead
+    const b = nearBall(c); let D = null;
+    if (b) {
+      const to = tB.copy(b.pos).sub(c.pos), dist = to.length();
+      if (to.y > 1.2 && dist < 45 && (to.x * c.fwd.x + to.z * c.fwd.z) > 0.25 * Math.hypot(to.x, to.z)) D = to.addScaledVector(b.vel, Math.min(1.2, dist / 25)).normalize();
+    }
+    if (!D) { D = tB.set(c.fwd.x, 0, c.fwd.z); if (D.lengthSq() < 0.01) D.set(c.up.x, 0, c.up.z); D.normalize().multiplyScalar(0.64).add(tD.set(0, 0.77, 0)).normalize(); }
+    const lf = tD.copy(D).applyQuaternion(tq);
+    pitchIn = clamp(Math.atan2(-lf.y, lf.z) * 3.2 - wl.x * 0.45, -1, 1);
+    yawIn = clamp(Math.atan2(-lf.x, lf.z) * 3.2 + wl.y * 0.45, -1, 1);
+  }
   if (flipping) c.dodgeT -= dt;
   wl.x += pitchIn * 12.46 * dt; wl.y += -yawIn * 9.11 * dt; wl.z += rollIn * 38.34 * dt;
   if (!flipping) {
@@ -2611,7 +2638,12 @@ function botThink(b, dt) {
   if (nBalls === 1 && G.kickT < 7 && ball.vel.lengthSq() < 0.01 && Math.abs(ball.pos.x) + Math.abs(ball.pos.z) < 0.1) {   // kickoff
     const ang = driveTo(c, I, ball.pos, P, true);   // kickoffs are always contested at full boost, so driving straight in is a 50/50, not a free goal
     I.throttle = 1; I.hb = false;
-    if (P.kick >= 1 && c.pos.distanceTo(ball.pos) < 5.6 && Math.abs(ang) < 0.25) { const [fx, sx] = dirTo(c, ball.pos); b.act = { type: 'dodge', t: 0, fx, sx }; }
+    const kd = c.pos.distanceTo(ball.pos);
+    if (G.kickT < 0.1) b.kf = 0;
+    if (P.kick >= 1 && !b.kf && kd < 27 && kd > 17 && c.grounded && c.vel.length() > 9 && Math.abs(ang) < 0.15) {   // speed flip: a front flip while boosting gets there first
+      b.kf = 1; b.act = { type: 'dodge', t: 0, fx: 1, sx: 0, boost: true }; return;
+    }
+    if (P.kick >= 1 && kd < 5.6 && Math.abs(ang) < 0.25 && c.grounded) { const [fx, sx] = dirTo(c, ball.pos); b.act = { type: 'dodge', t: 0, fx, sx }; }
     return;
   }
   const bst = c.boost > 5 && b.wantBoost;
@@ -2646,6 +2678,7 @@ function botThink(b, dt) {
 function runAct(b, dt, P, off) {
   const a = b.act, c = b.car, I = c.in, ball = b.ball; a.t += dt;
   if (a.type === 'dodge') {
+    if (a.boost) { I.boost = true; I.throttle = 1; }
     if (a.t < 0.07) I.jump = true;
     else if (a.t >= 0.11 && a.t < 0.16) { I.jump = true; I.pitch = a.fx; I.steer = a.sx; }
     if (a.t > 0.75) b.act = null;
@@ -2753,7 +2786,7 @@ function modeName(mode, ts, nb, vr) {
   return v + modeName0(mode, ts, nb);
 }
 function modeName0(mode, ts, nb) {
-  const m = mode === 'online' ? `Online ${G.rk && G.mode === 'online' ? 'Ranked ' : ''}${ts}v${ts}` : mode === 'ranked' ? `Ranked ${ts}v${ts}` : mode === 'casual' ? `Casual ${ts}v${ts} · ${DIFFS[S.diff][0]}` : 'Free Play';
+  const m = mode === 'online' ? `Online ${G.rk && G.mode === 'online' ? 'Ranked ' : ''}${ts}v${ts}` : mode === 'ranked' ? `Ranked ${ts}v${ts}` : mode === 'casual' ? `Casual ${ts}v${ts} · ${DIFFS[S.diff][0]} bots` : 'Free Play';
   return m + (nb > 1 ? ` · ${nb} balls` : '');
 }
 /* o.ts: players per team (1 to 4), o.nb: balls (1 to 3). Free Play is always you and one ball. */
@@ -2763,17 +2796,20 @@ function startMatch(mode, o) {
   const ts = mode === 'free' ? 1 : clamp((o.ts | 0) || 1, 1, mode === 'ranked' ? 3 : 4), nb = mode === 'free' ? 1 : clamp((o.nb | 0) || 1, 1, 3);
   G.mode = mode; G.ts = ts; G.nb = nb; G.score = [0, 0]; G.time = MATCH_LEN; G.ot = 0; G.overtime = false; G.infBoost = mode === 'free'; G.clock = 0; G.pts = 0; G.bd = {}; G.lastSec = -1; G.prayPaused = false; G.startedAt = Date.now();
   G.rk = mode === 'online' && !!o.rk; G.vr = (mode === 'casual' || mode === 'online') && !G.rk ? (VARS[o.vr] ? o.vr : 'soccar') : 'soccar'; G.ru = { next: 0.01 }; G.heatN = 0;
-  for (const c of [player].concat(mates, rivals)) { c.pu = null; c.puAct = null; c.puHeld = 0; }
+  for (const c of [player].concat(mates, rivals)) { c.pu = null; c.puAct = null; c.puHeld = 0; c.easyAir = false; }
+  player.easyAir = S.easyAir !== false;
   setBalls(nb); resetCoins(); $('#coinHud').textContent = 0; $('#coinHudW').hidden = mode === 'online';
   applyTeamCols(o.cols ? o.cols[0] : S.tcol, o.cols ? o.cols[1] : RIVAL_OF[S.tcol]);
   for (const c of mates.concat(rivals)) showCar(c, false);
   cars = [player]; bots = [];
-  const lv = mode === 'ranked' || G.rk ? S.ranks[ts].rank : DIFFS[mode === 'online' ? clamp(o.diff | 0, 0, DIFFS.length - 1) : S.diff][1], names = shuffle(BOTN.slice());
+  const dIdx = mode === 'online' ? clamp(o.diff | 0, 0, DIFFS.length - 1) : S.diff, auto = !(mode === 'ranked' || G.rk) && DIFFS[dIdx][1] < 0;
+  const lv = mode === 'ranked' || G.rk ? S.ranks[ts].rank : auto ? autoBase() : DIFFS[dIdx][1], names = shuffle(BOTN.slice());
+  G.auto = auto ? { base: lv } : null;
   const seat = [1, 0], idx = [0, 0];   // you sit on blue; brothers online take their seats; bots fill the rest
   if (mode === 'online') for (const h of o.humans || []) {
     const t = h.team === 1 ? 1 : 0; if (seat[t] >= ts) continue;
     const c = botCar(t, idx[t]++); cars.push(c); showCar(c, true); seat[t]++;
-    c.remote = h.pid; clearIn(c.in); c.st = h.st || BASE_ST; c.dress(h.eq); c.name = h.name; setTag(c, h.name);
+    c.remote = h.pid; c.easyAir = h.ea !== false; clearIn(c.in); c.st = h.st || BASE_ST; c.dress(h.eq); c.name = h.name; setTag(c, h.name);
   }
   if (mode !== 'free') for (let t = 0; t < 2; t++) for (; seat[t] < ts; seat[t]++) {
     const c = botCar(t, idx[t]++); cars.push(c); bots.push(new Bot(c, lv)); showCar(c, true); c.remote = null; c.st = BASE_ST;
@@ -2794,7 +2830,7 @@ function startMatch(mode, o) {
   if (mode === 'free') ot.hidden = true;
   else {
     const rival = cars.find(c => c.team === 1);
-    ot.hidden = false; ot.innerHTML = badge(Math.min(7, lv), 24) + `<span>${esc(ts === 1 ? rival.name : TC[1].n + ' team')} · ${mode === 'ranked' ? RANKS[lv].n : mode === 'online' ? 'Online' : DIFFS[S.diff][0]}</span>`;
+    ot.hidden = false; ot.innerHTML = badge(Math.min(7, lv), 24) + `<span>${esc(ts === 1 ? rival.name : TC[1].n + ' team')} · ${mode === 'ranked' ? RANKS[lv].n : mode === 'online' ? 'Online' : G.auto ? 'Auto · ' + RANKS[lv].n : DIFFS[S.diff][0]}</span>`;
   }
   if (mode === 'free') { player.place(0, -20, 0); placeBall(0, BR, 0); G.state = 'free'; flash('Free Play', '#eef3ff', 1.4, 'Unlimited boost. Try the drills up top.'); }
   else kickoff();
@@ -2826,8 +2862,16 @@ function playerTouched(b) {
   if (!player.grounded && player.pos.y > 3.5) award('Aerial Hit', 20);
   b.threat = post; b.threatT = 0.2;
 }
+const autoBase = () => clamp(Math.round(S.skill == null ? 3 : S.skill), 0, 6);
+/* Auto bots: every goal moves the other team's bots toward a close game. A lead makes them sharper, falling behind makes them ease off */
+function adaptBots() {
+  if (!G.auto) return;
+  const d = G.score[0] - G.score[1], adj = d > 0 ? Math.min(3, d) : Math.max(-2, Math.ceil(d * 0.7));
+  for (const b of bots) b.lv = clamp(G.auto.base + (b.car.team === 1 ? adj : 0), 0, 7);
+}
 function endMatch() {
   G.state = 'ended';
+  if (G.auto) S.skill = clamp((S.skill == null ? 3 : S.skill) + clamp((G.score[0] - G.score[1]) * 0.3, -0.9, 0.9), 0, 6.5);   // remember how good you are for the next match
   if (NET.role === 'host' && G.mode === 'online') for (const g of NET.guests) netSend(g.conn, { t: 'end', sc: G.score });
   const won = G.score[0] > G.score[1];
   let promoted = false, line = '';
@@ -2852,6 +2896,7 @@ function grantXP(xp, coins) {
 }
 function goalScored(team, b) {
   G.score[team]++;
+  adaptBots();
   const mine = team === 0, scorer = b.lastCar && b.lastCar.team === team ? b.lastCar : null;
   if (scorer) { stat(scorer, 'goals'); if (G.vr === 'heat') stat(scorer, 'heatGoals'); if (b.touchAir) stat(scorer, 'aerial'); }
   netEv({ e: 'goal', team, b: balls.indexOf(b), by: scorer ? cars.indexOf(scorer) : -1, kmh: Math.round(G.shotSpeed * 3.6), ot: G.overtime ? 1 : 0 });
@@ -3219,6 +3264,8 @@ $('#padOpts').addEventListener('click', e => { const b = e.target.closest('[data
 $('#padReset').addEventListener('click', () => { padCfg().map = Object.assign({}, PAD_DEF); PAD.capture = null; persist(); sfx.ui(); renderPad(); });
 $('#padBack').addEventListener('click', () => { PAD.capture = null; sfx.ui(); showScreen('#settings'); });
 $('#padBtn').addEventListener('click', () => { sfx.ui(); openPad(); });
+function renderEasy() { const on = S.easyAir !== false; $('#easyV').textContent = on ? 'ON' : 'OFF'; $('#easyBtn').classList.toggle('on', on); }
+$('#easyBtn').addEventListener('click', () => { S.easyAir = S.easyAir === false; player.easyAir = S.easyAir; persist(); sfx.ui(); renderEasy(); });
 
 /* ================= camera ================= */
 const cam = { pos: new V3(0, 8, -30), heading: new V3(0, 0, 1), up: new V3(0, 1, 0), ball: S.cam !== false, orbit: 0.6, dist: 3.0, height: 1.2, look: 0.85 };
@@ -3428,7 +3475,7 @@ const SCREENS = ['#menu', '#padScr', '#season', '#online', '#shop', '#modes', '#
 function showScreen(id) { for (const s of SCREENS) $(s).hidden = s !== id; }
 document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => {
   const g = b.dataset.go; audio(); sfx.ui();
-  if (g === 'settings') showScreen('#settings');
+  if (g === 'settings') { showScreen('#settings'); renderEasy(); }
   else if (g === 'garage') openGarage();
   else if (g === 'shop') openShop();
   else if (g === 'online') openOnline();
@@ -3456,7 +3503,7 @@ function renderModes() {
   }).join('');
   $('#mDiffWrap').hidden = rk; $('#mVarWrap').hidden = rk;
   if (!rk) $('#mVar').innerHTML = Object.keys(VARS).map(k => `<button class="${k === S.cvar ? 'on' : ''}" data-v="${k}" type="button">${VARS[k].n}<small>${VARS[k].d}</small></button>`).join('');
-  if (!rk) $('#mDiff').innerHTML = DIFFS.map((d, i) => `<button class="${i === S.diff ? 'on' : ''}" data-d="${i}" type="button">${d[0]}</button>`).join('');
+  if (!rk) $('#mDiff').innerHTML = DIFFS.map((d, i) => `<button class="${i === S.diff ? 'on' : ''}" data-d="${i}" type="button">${d[0]}${d[1] < 0 ? '<small>Matches how you play</small>' : ''}</button>`).join('');
   $('#mBalls').innerHTML = [1, 2, 3].map(n => `<button class="${n === nb ? 'on' : ''}" data-nb="${n}" type="button">${n} ball${n > 1 ? 's' : ''}<small>${n === 1 ? 'Real game' : 'Just for fun'}</small></button>`).join('');
   $('#mNote').textContent = nb === 1 ? 'One ball, just like the real game.' : `${nb} balls at once, just for fun. A scored ball drops back in at the middle and play goes on.`;
   $('#mPlaySub').textContent = modeName(modeSel, ts, nb, rk ? 'soccar' : S.cvar) + (rk ? ' · ' + RANKS[S.ranks[ts].rank].n : '');
@@ -4462,7 +4509,7 @@ function tick(dt, now, auto) {   // one frame of game logic (auto: the player's 
    code, and the host taps Accept before anyone gets in. */
 const NETV = 1;
 const NET = { role: null, peer: null, conn: null, guests: [], pending: [], open: false, joined: false, lobby: null, status: '',
-  ts: 2, nb: 1, diff: 1, vr: 'soccar', rk: false, code: '', myTeam: 0, snap: null, snapAt: 0, lastN: 0, prevSt: '', seq: 0, sendT: 0, inT: 0, lastF: -1, waitShown: false, hostName: '' };
+  ts: 2, nb: 1, diff: 0, vr: 'soccar', rk: false, code: '', myTeam: 0, snap: null, snapAt: 0, lastN: 0, prevSt: '', seq: 0, sendT: 0, inT: 0, lastF: -1, waitShown: false, hostName: '' };
 try { const o = JSON.parse(localStorage.getItem('rocketgoal.net.v1') || '{}'); if (typeof o.code === 'string') NET.code = o.code.replace(/\D/g, '').slice(0, 6); } catch (e) {}
 const netSave = () => { try { localStorage.setItem('rocketgoal.net.v1', JSON.stringify({ code: NET.code })); } catch (e) {} };
 const netOK = () => typeof window.Peer === 'function' && !!(window.RG_APP || window.RG_PEER);
@@ -4533,7 +4580,7 @@ function netHostData(conn, d) {
     if (NET.pending.some(r => r.conn === conn) || NET.guests.some(g => g.conn === conn)) return;
     if (d.v !== NETV) { netSend(conn, { t: 'no', why: 'version' }); return; }
     if (NET.guests.length + NET.pending.length >= 7) { netSend(conn, { t: 'no', why: 'full' }); return; }
-    NET.pending.push({ conn, pid: conn.peer, ro: !!d.ro, name: cleanName(d.name) || 'Player', col: TCOL[d.col] ? d.col : 'orange', eq: cleanEq(d.eq), st: cleanSt(d.st), side: 1 });
+    NET.pending.push({ conn, pid: conn.peer, ro: !!d.ro, ea: d.ea !== 0, name: cleanName(d.name) || 'Player', col: TCOL[d.col] ? d.col : 'orange', eq: cleanEq(d.eq), st: cleanSt(d.st), side: 1 });
     sfx.ui(); buzz(40); renderOnline();
     const rq = $('#olReq'); if (rq.firstChild && !$('#online').hidden) try { rq.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
     if (G.mode === 'online' && inGame()) flash(`${cleanName(d.name) || 'Someone'} wants to join`, '#eef3ff', 2.5, 'Accept in the Online screen after this match');
@@ -4560,7 +4607,7 @@ function netDrop(conn, why) {
   const gi = NET.guests.findIndex(g => g.conn === conn); if (gi < 0) return;
   const g = NET.guests.splice(gi, 1)[0];
   if (G.mode === 'online' && g.car && g.car.remote === g.pid) {   // mid-match: a bot takes over the car
-    g.car.remote = null; clearIn(g.car.in); bots.push(new Bot(g.car, DIFFS[NET.diff][1]));
+    g.car.remote = null; clearIn(g.car.in); bots.push(new Bot(g.car, G.auto ? G.auto.base : Math.max(0, DIFFS[NET.diff][1])));
     if (G.state !== 'ended') flash(`${g.name} ${why === 'prayer' ? 'stopped to pray' : 'left the match'}`, '#eef3ff', 2.2, 'A bot drives that car now');
   }
   netLobby();
@@ -4585,7 +4632,7 @@ function netStart() {
   if (n[0] > ts || n[1] > ts) { netStatus(`Too many players on one team for ${ts}v${ts}. Pick more players per team, or someone switches sides.`); return; }
   const cols = teamColsFor();
   audio(); sfx.ui();
-  startMatch('online', { ts, nb: NET.nb, diff: NET.diff, vr: NET.vr, rk: NET.rk, cols, humans: NET.guests.map(g => ({ team: g.side, name: g.name, eq: g.eq, st: g.st, pid: g.pid })) });
+  startMatch('online', { ts, nb: NET.nb, diff: NET.diff, vr: NET.vr, rk: NET.rk, cols, humans: NET.guests.map(g => ({ team: g.side, name: g.name, eq: g.eq, st: g.st, pid: g.pid, ea: g.ea })) });
   for (const g of NET.guests) { g.car = cars.find(c => c.remote === g.pid) || null; g.inAt = performance.now(); }
   const roster = cars.map(c => ({ team: c.team, name: c === player ? myName() : c.name, eq: c === player ? S.eq : c.eqd }));
   for (const g of NET.guests) netSend(g.conn, { t: 'start', ts, nb: NET.nb, vr: NET.vr, rk: NET.rk ? 1 : 0, cols, cars: roster, me: cars.indexOf(g.car), host: myName() });
@@ -4617,7 +4664,7 @@ function netJoin(name) {
   p.on('open', () => {
     const c = NET.conn = p.connect(netId(name), { reliable: true, serialization: 'json' });
     c.on('open', () => {
-      netSend(c, { t: 'hello', v: NETV, name: myName(), col: S.tcol, eq: S.eq, st: carStats(S, S.eq.body), ro: rankedOpen() ? 1 : 0 });
+      netSend(c, { t: 'hello', v: NETV, name: myName(), col: S.tcol, eq: S.eq, st: carStats(S, S.eq.body), ro: rankedOpen() ? 1 : 0, ea: S.easyAir !== false ? 1 : 0 });
       netStatus(`Found ${NET.hostName}! Waiting for ${NET.hostName} to tap Accept…`);
     });
     c.on('data', netGuestData);
